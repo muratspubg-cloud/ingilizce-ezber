@@ -1,4 +1,4 @@
-name: Build APK (Final Fix v3)
+name: Build APK (Ubuntu 24.04 Fix)
 
 on:
   push:
@@ -23,14 +23,14 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      # 2. Python Kurulumu (3.9 en stabildir)
+      # 2. Python Kurulumu (Buildozer için en kararlı sürüm)
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # 3. Linux Kütüphaneleri (HATA ÇÖZÜMÜ BURADA)
-      # libtinfo5 ve libncurses5 YERİNE libncurses-dev kullanıyoruz
+      # 3. Gerekli Linux Araçlarını Kur (HATA BURADAYDI, DÜZELTİLDİ)
+      # libncurses5 ve libtinfo5 SILINDI, yerine libncurses-dev EKLENDI
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -40,18 +40,20 @@ jobs:
             libavformat-dev libavcodec-dev zlib1g-dev libncurses-dev \
             libffi-dev libssl-dev autoconf libtool pkg-config zip unzip openjdk-17-jdk
 
-      # 4. Buildozer Kurulumu
-      - name: Install Buildozer
+      # 4. Buildozer ve Kütüphaneleri Kur
+      - name: Install Buildozer & Libraries
         run: |
           pip install --upgrade pip
           pip install buildozer cython==0.29.33
           pip install kivy requests plyer pyjnius
 
-      # 5. SDK Lisansı ve Sürüm Sabitleme (HATA ÇÖZÜMÜ BURADA)
-      # Buildozer'ın soru sormasını engellemek için ayarları zorla değiştiriyoruz
+      # 5. Buildozer Ayarlarını ve SDK'yı Otomatik Düzelt
       - name: Fix Buildozer Spec & SDK
         run: |
+          # SDK lisansını otomatik kabul etmesi için ayar ekle
           sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
+          
+          # NDK sürümünü sabitle (Hata önleyici)
           sed -i 's/# android.ndk = 19c/android.ndk = 25b/' buildozer.spec
           sed -i 's/# android.api = 27/android.api = 33/' buildozer.spec
 
@@ -60,7 +62,7 @@ jobs:
         run: |
           buildozer android debug
 
-      # 7. Yükleme
+      # 7. Sonucu Yükle
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
