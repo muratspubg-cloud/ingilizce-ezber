@@ -14,9 +14,8 @@ from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
 from plyer import tts
 
-# --- AYARLAR ---
-# Google Sheets "CSV" linkini buraya yapıştır. Yoksa boş kalsın.
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv" 
+# LINK YOKSA BOŞ BIRAKIN
+CSV_URL = "LINK_YOK" 
 
 Window.clearcolor = (0.1, 0.1, 0.1, 1)
 
@@ -27,7 +26,6 @@ class VeriYoneticisi:
         self.yukle()
 
     def dosya_yolu_bul(self):
-        # Android ve PC uyumlu dosya yolu
         if platform == 'android':
             from android.storage import app_storage_path
             klasor = app_storage_path()
@@ -36,7 +34,7 @@ class VeriYoneticisi:
         
         yol = os.path.join(klasor, 'kelimeler.csv')
         
-        # Eğer çalışma alanında yoksa, APK içinden kopyala
+        # APK içindeki dosyayı çalışma alanına kopyala (İlk açılış)
         if not os.path.exists(yol) and os.path.exists('kelimeler.csv'):
             try: shutil.copy('kelimeler.csv', yol)
             except: pass
@@ -45,11 +43,14 @@ class VeriYoneticisi:
     def internetten_guncelle(self):
         try:
             if "http" not in CSV_URL: return False, "Link Girilmemiş!"
+            
+            # Timeout ekledik ki sonsuza kadar beklemesin
             response = requests.get(CSV_URL, timeout=15)
             response.raise_for_status()
-            # Binary olarak kaydet (UTF-8 sorunu olmasın)
+            
             with open(self.dosya_yolu, 'wb') as f:
                 f.write(response.content)
+            
             self.yukle()
             return True, "Başarıyla Güncellendi!"
         except Exception as e:
@@ -60,7 +61,6 @@ class VeriYoneticisi:
         if not os.path.exists(self.dosya_yolu): return
         try:
             with open(self.dosya_yolu, 'r', encoding='utf-8') as f:
-                # Noktalı virgül mü virgül mü kontrol et
                 content = f.read()
                 delimiter = ';' if ';' in content.splitlines()[0] else ','
                 f.seek(0)
@@ -68,12 +68,10 @@ class VeriYoneticisi:
                 reader = csv.reader(f, delimiter=delimiter)
                 rows = list(reader)
                 
-                # Başlık satırını atla (Eğer ilk satırda "Sıra" yazıyorsa)
-                start_index = 1 if rows and "Sıra" in rows[0][0] else 0
+                start_index = 1 if rows and len(rows[0]) > 0 and "Sıra" in str(rows[0][0]) else 0
                 
                 for i in range(start_index, len(rows)):
                     row = rows[i]
-                    # En az 7 sütun olmalı ve ilk sütun sayı olmalı
                     if len(row) < 7: continue
                     
                     self.veriler.append({
@@ -81,7 +79,7 @@ class VeriYoneticisi:
                         "okunus": row[4], "cen": row[5], "ctr": row[6]
                     })
         except Exception as e:
-            print(f"Yükleme hatası: {e}")
+            print(f"Veri hatası: {e}")
 
 YONETICI = VeriYoneticisi()
 
@@ -96,7 +94,7 @@ class InfoEkrani(Screen):
         layout.add_widget(btn)
         self.add_widget(layout)
     def on_pre_enter(self):
-        self.lbl.text = f"Kelime Sayısı:\\n{len(YONETICI.veriler)}\\n\\nDurum: Aktif"
+        self.lbl.text = f"Kelime Sayısı:\\n{len(YONETICI.veriler)}\\n\\nVeritabanı: Aktif"
 
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
