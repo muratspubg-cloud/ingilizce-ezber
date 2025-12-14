@@ -14,57 +14,21 @@ from kivy.uix.popup import Popup
 from kivy.uix.togglebutton import ToggleButton
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
+from plyer import tts
 
 # --- AYARLAR ---
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv" 
 
 Window.clearcolor = (0.1, 0.1, 0.1, 1)
 
-# --- GLOBAL AYARLAR ---
-AYARLAR = {
-    "konusma_hizi": 1.0  # Varsayılan Normal (1.0)
-}
-
-# --- GELİŞMİŞ SES YÖNETİCİSİ (ANDROID NATIVE) ---
-class SesYoneticisi:
-    def __init__(self):
-        self.tts = None
-        if platform == 'android':
-            try:
-                from jnius import autoclass
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                TextToSpeech = autoclass('android.speech.tts.TextToSpeech')
-                Locale = autoclass('java.util.Locale')
-                
-                # TTS Motorunu Başlat
-                self.tts = TextToSpeech(PythonActivity.mActivity, None)
-                self.tts.setLanguage(Locale.US)
-            except Exception as e:
-                print(f"TTS Başlatma Hatası: {e}")
-        else:
-            # Bilgisayar için basit plyer (Hız ayarı çalışmayabilir ama ses verir)
-            try:
-                from plyer import tts
-                self.plyer_tts = tts
-            except: pass
-
-    def oku(self, metin):
-        hiz = AYARLAR["konusma_hizi"]
-        
-        if platform == 'android' and self.tts:
-            try:
-                self.tts.setSpeechRate(float(hiz))
-                self.tts.speak(metin, 0, None)
-            except Exception as e:
-                print(f"Okuma Hatası: {e}")
-        else:
-            # PC Fallback
-            try:
-                self.plyer_tts.speak(metin)
-            except: 
-                print(f"Seslendiriliyor (PC): {metin} (Hız: {hiz})")
-
-SES = SesYoneticisi()
+# CSV Okunamazsa kullanılacak yedek veriler (Çökmeyi engeller)
+YEDEK_VERILER = [
+    {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
+    {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"},
+    {"tr": "Elma", "en": "Apple", "ipa": "", "okunus": "epıl", "cen": "I like apple", "ctr": "Elma severim"},
+    {"tr": "Kitap", "en": "Book", "ipa": "", "okunus": "buk", "cen": "Read a book", "ctr": "Kitap oku"},
+    {"tr": "Su", "en": "Water", "ipa": "", "okunus": "votır", "cen": "Drink water", "ctr": "Su iç"}
+]
 
 class VeriYoneticisi:
     def __init__(self):
@@ -100,76 +64,57 @@ class VeriYoneticisi:
 
     def yukle(self):
         self.veriler = []
-        if not os.path.exists(self.dosya_yolu): return
-        try:
-            with open(self.dosya_yolu, 'r', encoding='utf-8') as f:
-                content = f.read()
-                delimiter = ';' if ';' in content.splitlines()[0] else ','
-                f.seek(0)
-                reader = csv.reader(f, delimiter=delimiter)
-                rows = list(reader)
-                start = 1 if rows and "Sıra" in str(rows[0][0]) else 0
-                
-                for i in range(start, len(rows)):
-                    row = rows[i]
-                    if len(row) < 2: continue
-                    def safe(idx): return row[idx].replace("\\n", " ").strip() if idx < len(row) else ""
-                    
-                    self.veriler.append({
-                        "tr": safe(1), "en": safe(2), "ipa": safe(3), 
-                        "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
-                    })
-        except Exception as e:
-            print(f"Hata: {e}")
+        
+        # 1. Yöntem: Dosyadan Oku
+        if os.path.exists(self.dosya_yolu):
+            try:
+                with open(self.dosya_yolu, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    if content:
+                        delimiter = ';' if ';' in content.splitlines()[0] else ','
+                        f.seek(0)
+                        reader = csv.reader(f, delimiter=delimiter)
+                        rows = list(reader)
+                        
+                        start = 0
+                        if rows and len(rows[0]) > 0 and "Sıra" in str(rows[0][0]):
+                            start = 1
+                        
+                        for i in range(start, len(rows)):
+                            row = rows[i]
+                            if len(row) < 2: continue
+                            
+                            def safe(idx): 
+                                val = row[idx] if idx < len(row) else ""
+                                return val.replace("\\n", " ").strip()
+                            
+                            self.veriler.append({
+                                "tr": safe(1), "en": safe(2), "ipa": safe(3), 
+                                "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
+                            })
+            except Exception as e:
+                print(f"CSV Okuma Hatası: {e}")
+
+        # 2. Yöntem: Eğer liste boş kaldıysa YEDEK verileri yükle
+        if not self.veriler:
+            print("CSV boş veya hatalı, yedek veriler yükleniyor...")
+            self.veriler = YEDEK_VERILER.copy()
 
 YONETICI = VeriYoneticisi()
 
-# --- AYARLAR EKRANI (YENİ) ---
 class AyarlarEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
+        layout.add_widget(Label(text="Ayarlar", font_size='28sp'))
+        layout.add_widget(Label(text="Ses hızı ayarı cihazın kendi\nmetin okuma (TTS) ayarlarından yapılır.", font_size='16sp', color=(0.7,0.7,0.7,1)))
         
-        layout.add_widget(Label(text="Konuşma Hızı Ayarı", font_size='28sp', size_hint=(1, 0.2)))
-        
-        # Hız Seçenekleri (Toggle Buttonlar)
-        grid = GridLayout(cols=3, spacing=10, size_hint=(1, 0.2))
-        
-        self.btn_yavas = ToggleButton(text="Yavaş\n(0.5x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
-        self.btn_normal = ToggleButton(text="Normal\n(1.0x)", group='hiz', state='down', background_color=(0.2, 0.6, 0.8, 1))
-        self.btn_hizli = ToggleButton(text="Hızlı\n(1.5x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
-        
-        self.btn_yavas.bind(on_press=lambda x: self.hiz_degistir(0.5))
-        self.btn_normal.bind(on_press=lambda x: self.hiz_degistir(1.0))
-        self.btn_hizli.bind(on_press=lambda x: self.hiz_degistir(1.5))
-        
-        grid.add_widget(self.btn_yavas)
-        grid.add_widget(self.btn_normal)
-        grid.add_widget(self.btn_hizli)
-        
-        layout.add_widget(grid)
-        layout.add_widget(Label(text="", size_hint=(1, 0.4))) # Boşluk
-        
-        btn_geri = Button(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, 0.2))
-        btn_geri.bind(on_press=self.kaydet_don)
+        btn_geri = Button(text="Ana Menüye Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, 0.2))
+        btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
-        
         self.add_widget(layout)
 
-    def hiz_degistir(self, hiz):
-        AYARLAR["konusma_hizi"] = hiz
-        # Buton renklerini güncelle
-        def renk_ayarla(btn, aktif_mi):
-            btn.background_color = (0.2, 0.6, 0.8, 1) if aktif_mi else (0.3, 0.3, 0.3, 1)
-            
-        renk_ayarla(self.btn_yavas, hiz == 0.5)
-        renk_ayarla(self.btn_normal, hiz == 1.0)
-        renk_ayarla(self.btn_hizli, hiz == 1.5)
-        
-        # Test sesi
-        SES.oku("Speed test")
-
-    def kaydet_don(self, instance):
+    def don(self, instance):
         self.manager.current = 'menu'
 
 class AnaMenu(Screen):
@@ -182,7 +127,6 @@ class AnaMenu(Screen):
         btn2 = Button(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), on_press=lambda x: self.gecis("cumle"))
         btn3 = Button(text="Listeyi Güncelle", background_color=(1,0.5,0,1), on_press=self.guncelle)
         
-        # AYARLAR VE INFO YAN YANA
         alt_grid = GridLayout(cols=2, spacing=10, size_hint=(1, 0.15))
         btn_ayarlar = Button(text="⚙️ Ayarlar", background_color=(0.5, 0.5, 0.5, 1), on_press=lambda x: setattr(self.manager, 'current', 'ayarlar'))
         btn_info = Button(text="ℹ️ Info", background_color=(0,0.8,0.8,1), on_press=lambda x: setattr(self.manager, 'current', 'info'))
@@ -205,11 +149,17 @@ class AnaMenu(Screen):
         Popup(title='Durum', content=Label(text=msj), size_hint=(0.8, 0.4)).open()
 
     def gecis(self, mod):
+        # KRİTİK KONTROL: Veri yoksa çökme, uyarı ver
         if not YONETICI.veriler:
-            Popup(title='Hata', content=Label(text='Liste Boş!'), size_hint=(0.8, 0.4)).open()
+            Popup(title='Hata', content=Label(text='Veri Yüklenemedi!'), size_hint=(0.8, 0.4)).open()
             return
-        self.manager.get_screen('calisma').baslat(mod)
-        self.manager.current = 'calisma'
+        
+        try:
+            ekran = self.manager.get_screen('calisma')
+            ekran.baslat(mod)
+            self.manager.current = 'calisma'
+        except Exception as e:
+            Popup(title='Hata', content=Label(text=str(e)), size_hint=(0.8, 0.4)).open()
 
 class InfoEkrani(Screen):
     def __init__(self, **kwargs):
@@ -222,7 +172,10 @@ class InfoEkrani(Screen):
         layout.add_widget(btn)
         self.add_widget(layout)
     def on_pre_enter(self):
-        self.lbl.text = f"Kelime Sayısı:\\n{len(YONETICI.veriler)}\\n\\nDurum: Aktif"
+        # Güvenli sayı kontrolü
+        sayi = len(YONETICI.veriler) if YONETICI.veriler else 0
+        kaynak = "Yedek Veri" if YONETICI.veriler == YEDEK_VERILER else "CSV Dosyası"
+        self.lbl.text = f"Kelime Sayısı:\\n{sayi}\\n\\nKaynak:\\n{kaynak}"
 
 class Calisma(Screen):
     def __init__(self, **kwargs):
@@ -243,40 +196,55 @@ class Calisma(Screen):
         
         layout.add_widget(self.kart); layout.add_widget(self.btn_ses); layout.add_widget(btns); self.add_widget(layout)
 
-    def baslat(self, mod): self.mod = mod; self.gecmis = []; self.ileri(None)
+    def baslat(self, mod): 
+        self.mod = mod; self.gecmis = []
+        # Eğer veri yoksa başlatma
+        if not YONETICI.veriler: return
+        self.ileri(None)
     
     def seslendir(self, i):
         if self.aktif:
-            metin = self.aktif['en'] if self.mod == "kelime" else self.aktif['cen']
-            SES.oku(metin)
+            try:
+                # Güvenli seslendirme (sadece plyer)
+                text = self.aktif['en'] if self.mod == "kelime" else self.aktif['cen']
+                if text: tts.speak(text)
+            except: pass
             
     def guncelle(self):
         try:
             self.kart.markup = True; v = self.aktif
+            if not v: return # Veri yoksa işlem yapma
+
             if not self.cevrildi:
                 self.kart.background_color = get_color_from_hex('#455A64')
                 soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
                 ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
-                
-                # --- DÜZELTME BURADA ---
-                # \n yerine tek bir satır atlama karakteri kullanıyoruz
-                self.kart.text = f"[b]{soru}[/b]\n\n\n[size=18]{ipucu}[/size]"
+                self.kart.text = f"[b]{soru}[/b]\\n\\n\\n[size=18]{ipucu}[/size]"
             else:
                 self.kart.background_color = get_color_from_hex('#FFECB3'); self.kart.color = (0,0,0,1)
                 
                 if self.mod == "kelime":
-                    # --- DÜZELTME BURADA ---
-                    # Gereksiz \n işaretleri temizlendi
-                    self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\n[{v['okunus']}]\n---\n{v['tr']}"
+                    # IPA kaldırdık, sadece okunuş
+                    self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\\n[{v['okunus']}]\\n---\\n{v['tr']}"
                 else:
-                    self.kart.text = f"[b]{v['cen']}[/b]\n---\n{v['ctr']}"
+                    self.kart.text = f"[b]{v['cen']}[/b]\\n---\\n{v['ctr']}"
         except Exception as e:
-            self.kart.text = "Görüntüleme Hatası"
+            self.kart.text = "Hata"
 
     def cevir(self, i): self.cevrildi = not self.cevrildi; self.guncelle()
+    
     def ileri(self, i): 
-        if getattr(self,'akt',None): self.gec.append({"v":self.akt,"y":self.y})
-        if YONETICI.veriler: self.akt=random.choice(YONETICI.veriler); self.y=random.choice(["tr_to_en","en_to_tr"]); self.aktif=self.akt; self.yon=self.y; self.cevrildi=False; self.guncelle()
+        if not YONETICI.veriler: return # Liste boşsa dur
+        
+        if getattr(self,'aktif',None): self.gec.append({"v":self.aktif,"y":self.yon})
+        
+        try:
+            self.aktif = random.choice(YONETICI.veriler)
+            self.yon = random.choice(["tr_to_en","en_to_tr"])
+            self.cevrildi = False
+            self.guncelle()
+        except: pass
+
     def geri(self, i): 
         if self.gec: s=self.gec.pop(); self.aktif=s["v"]; self.yon=s["y"]; self.cevrildi=False; self.guncelle()
 
@@ -285,7 +253,7 @@ class AppMain(App):
         sm = ScreenManager()
         sm.add_widget(AnaMenu(name='menu'))
         sm.add_widget(InfoEkrani(name='info'))
-        sm.add_widget(AyarlarEkrani(name='ayarlar')) # Yeni ekran eklendi
+        sm.add_widget(AyarlarEkrani(name='ayarlar'))
         sm.add_widget(Calisma(name='calisma'))
         return sm
 
