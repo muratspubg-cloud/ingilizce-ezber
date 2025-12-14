@@ -1,4 +1,4 @@
-name: Android APK Yapici
+name: Build APK (Manuel Kurulum)
 
 on:
   push:
@@ -9,9 +9,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      # Gereksiz dosyaları temizle ve diskte yer aç
+      # 1. Disk Alanı Açma (Hata önleyici)
       - name: Free Disk Space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -23,13 +23,45 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
+      # 2. Java Kurulumu (Android SDK için şart)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
         with:
-          command: buildozer android debug
-          buildozer_version: master
+          java-version: '17'
+          distribution: 'temurin'
 
+      # 3. Python Kurulumu
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # 4. Gerekli Linux Araçlarını Kur
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git ffmpeg libsdl2-dev libsdl2-image-dev \
+            libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev \
+            libavformat-dev libavcodec-dev zlib1g-dev libncurses5-dev \
+            libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev \
+            autoconf libtool pkg-config zip unzip
+
+      # 5. Buildozer ve Kütüphaneleri Kur
+      - name: Install Buildozer & Libraries
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.33
+          # Kivy ve diğer gereksinimleri önden yükleyelim
+          pip install kivy requests plyer pyjnius
+
+      # 6. APK Üretimi (En uzun süren adım)
+      - name: Build with Buildozer
+        run: |
+          # SDK lisansını otomatik kabul et ve derle
+          yes | buildozer android debug
+
+      # 7. Sonucu Yükle
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
