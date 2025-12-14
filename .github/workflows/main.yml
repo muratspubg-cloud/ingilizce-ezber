@@ -1,4 +1,4 @@
-name: Build APK (Ubuntu 24.04 Fix)
+name: Build APK (Final Fix v4)
 
 on:
   push:
@@ -23,14 +23,14 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      # 2. Python Kurulumu (Buildozer için en kararlı sürüm)
+      # 2. Python Kurulumu
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # 3. Gerekli Linux Araçlarını Kur (HATA BURADAYDI, DÜZELTİLDİ)
-      # libncurses5 ve libtinfo5 SILINDI, yerine libncurses-dev EKLENDI
+      # 3. Gerekli Linux Araçlarını Kur (GÜNCEL UBUNTU PAKETLERİ)
+      # libncurses5 ve libtinfo5 YERİNE libncurses-dev EKLENDİ
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -40,20 +40,19 @@ jobs:
             libavformat-dev libavcodec-dev zlib1g-dev libncurses-dev \
             libffi-dev libssl-dev autoconf libtool pkg-config zip unzip openjdk-17-jdk
 
-      # 4. Buildozer ve Kütüphaneleri Kur
-      - name: Install Buildozer & Libraries
+      # 4. Buildozer Kurulumu
+      - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install buildozer cython==0.29.33
           pip install kivy requests plyer pyjnius
 
-      # 5. Buildozer Ayarlarını ve SDK'yı Otomatik Düzelt
+      # 5. Buildozer ve SDK Ayarları
       - name: Fix Buildozer Spec & SDK
         run: |
-          # SDK lisansını otomatik kabul etmesi için ayar ekle
+          # SDK Lisans Onayı
           sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
-          
-          # NDK sürümünü sabitle (Hata önleyici)
+          # Sürüm Sabitleme
           sed -i 's/# android.ndk = 19c/android.ndk = 25b/' buildozer.spec
           sed -i 's/# android.api = 27/android.api = 33/' buildozer.spec
 
@@ -62,7 +61,7 @@ jobs:
         run: |
           buildozer android debug
 
-      # 7. Sonucu Yükle
+      # 7. Yükleme
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
