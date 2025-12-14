@@ -14,8 +14,8 @@ from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
 from plyer import tts
 
-# LINK YOKSA BOŞ BIRAKIN
-CSV_URL = "LINK_YOK" 
+# AYARLAR
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv" 
 
 Window.clearcolor = (0.1, 0.1, 0.1, 1)
 
@@ -34,7 +34,7 @@ class VeriYoneticisi:
         
         yol = os.path.join(klasor, 'kelimeler.csv')
         
-        # APK içindeki dosyayı çalışma alanına kopyala (İlk açılış)
+        # Eğer dosya yoksa, APK içinden kopyalamayı dene
         if not os.path.exists(yol) and os.path.exists('kelimeler.csv'):
             try: shutil.copy('kelimeler.csv', yol)
             except: pass
@@ -43,14 +43,10 @@ class VeriYoneticisi:
     def internetten_guncelle(self):
         try:
             if "http" not in CSV_URL: return False, "Link Girilmemiş!"
-            
-            # Timeout ekledik ki sonsuza kadar beklemesin
             response = requests.get(CSV_URL, timeout=15)
             response.raise_for_status()
-            
             with open(self.dosya_yolu, 'wb') as f:
                 f.write(response.content)
-            
             self.yukle()
             return True, "Başarıyla Güncellendi!"
         except Exception as e:
@@ -58,28 +54,40 @@ class VeriYoneticisi:
 
     def yukle(self):
         self.veriler = []
+        # Eğer dosya yoksa, basit bir liste oluştur (Çökmeyi önler)
         if not os.path.exists(self.dosya_yolu): return
+        
         try:
             with open(self.dosya_yolu, 'r', encoding='utf-8') as f:
                 content = f.read()
+                # Ayırıcıyı bul (; veya ,)
                 delimiter = ';' if ';' in content.splitlines()[0] else ','
                 f.seek(0)
                 
                 reader = csv.reader(f, delimiter=delimiter)
                 rows = list(reader)
                 
-                start_index = 1 if rows and len(rows[0]) > 0 and "Sıra" in str(rows[0][0]) else 0
+                # Başlık kontrolü
+                start_index = 1 if rows and len(rows[0])>0 and "Sıra" in str(rows[0][0]) else 0
                 
                 for i in range(start_index, len(rows)):
                     row = rows[i]
-                    if len(row) < 7: continue
+                    # En az 3 sütun bile olsa çalışsın, eksikleri boş geçelim
+                    if len(row) < 2: continue
+                    
+                    # Güvenli veri çekme (Hata olursa boş string ata)
+                    def safe_get(idx): return row[idx] if idx < len(row) else ""
                     
                     self.veriler.append({
-                        "tr": row[1], "en": row[2], "ipa": row[3], 
-                        "okunus": row[4], "cen": row[5], "ctr": row[6]
+                        "tr": safe_get(1), 
+                        "en": safe_get(2), 
+                        "ipa": safe_get(3), # Bunu artık ekrana yazmıyoruz
+                        "okunus": safe_get(4), 
+                        "cen": safe_get(5), 
+                        "ctr": safe_get(6)
                     })
         except Exception as e:
-            print(f"Veri hatası: {e}")
+            print(f"Yükleme hatası: {e}")
 
 YONETICI = VeriYoneticisi()
 
@@ -94,7 +102,7 @@ class InfoEkrani(Screen):
         layout.add_widget(btn)
         self.add_widget(layout)
     def on_pre_enter(self):
-        self.lbl.text = f"Kelime Sayısı:\\n{len(YONETICI.veriler)}\\n\\nVeritabanı: Aktif"
+        self.lbl.text = f"Kelime Sayısı:\\n{len(YONETICI.veriler)}\\n\\nDurum: Aktif"
 
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
@@ -119,8 +127,9 @@ class AnaMenu(Screen):
 
     def gecis(self, mod):
         if not YONETICI.veriler:
-            Popup(title='Hata', content=Label(text='Liste Boş!'), size_hint=(0.8, 0.4)).open()
+            Popup(title='Hata', content=Label(text='Liste Boş veya Yüklenemedi!'), size_hint=(0.8, 0.4)).open()
             return
+        # Çalışma ekranına geç
         self.manager.get_screen('calisma').baslat(mod)
         self.manager.current = 'calisma'
 
@@ -130,7 +139,11 @@ class Calisma(Screen):
         self.gecmis, self.aktif, self.yon, self.cevrildi = [], None, "tr_to_en", False
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
         
-        self.kart = Button(text="Başla", font_size='24sp', on_press=self.cevir)
+        # Text boyutunu küçülttük ve text_size ekledik ki taşmasın
+        self.kart = Button(text="Başla", font_size='24sp', halign='center', valign='middle')
+        self.kart.bind(size=self.kart.setter('text_size')) # Metni ortalar ve sığdırır
+        self.kart.bind(on_press=self.cevir)
+        
         self.btn_ses = Button(text="🔊 DİNLE", size_hint=(1, 0.15), background_color=(0.5, 0.5, 0.5, 1), on_press=self.seslendir)
         
         btns = BoxLayout(size_hint=(1,0.15), spacing=10)
@@ -140,28 +153,44 @@ class Calisma(Screen):
         
         layout.add_widget(self.kart); layout.add_widget(self.btn_ses); layout.add_widget(btns); self.add_widget(layout)
 
-    def baslat(self, mod): self.mod = mod; self.gecmis = []; self.ileri(None)
-    
+    def baslat(self, mod): 
+        self.mod = mod; self.gecmis = []
+        try:
+            self.ileri(None)
+        except Exception as e:
+            self.kart.text = f"Hata Oluştu:\\n{str(e)}"
+
     def seslendir(self, i):
         if self.aktif:
             try: tts.speak(self.aktif['en'] if self.mod == "kelime" else self.aktif['cen'])
             except: pass
             
     def guncelle(self):
-        self.kart.markup = True; v = self.aktif
-        if not self.cevrildi:
-            self.kart.background_color = get_color_from_hex('#455A64')
-            soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
-            ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
-            self.kart.text = f"[b]{soru}[/b]\\n\\n\\n[size=18]{ipucu}[/size]"
-        else:
-            self.kart.background_color = get_color_from_hex('#FFECB3'); self.kart.color = (0,0,0,1)
-            self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\\n/{v['ipa']}/\\n[{v['okunus']}]\\n---\\n{v['tr']}" if self.mod=="kelime" else f"[b]{v['cen']}[/b]\\n---\\n{v['ctr']}"
-            
+        try:
+            self.kart.markup = True; v = self.aktif
+            if not self.cevrildi:
+                self.kart.background_color = get_color_from_hex('#455A64')
+                soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
+                ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
+                self.kart.text = f"[b]{soru}[/b]\\n\\n\\n[size=18]{ipucu}[/size]"
+            else:
+                self.kart.background_color = get_color_from_hex('#FFECB3'); self.kart.color = (0,0,0,1)
+                
+                # --- KRİTİK DEĞİŞİKLİK BURADA ---
+                # IPA (Fonetik) kısmını sildik çünkü Android fontları çökertiyor.
+                # Yerine sadece Türkçe okunuşu [okunus] koyduk.
+                if self.mod == "kelime":
+                    self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\\n[{v['okunus']}]\\n---\\n{v['tr']}"
+                else:
+                    self.kart.text = f"[b]{v['cen']}[/b]\\n---\\n{v['ctr']}"
+        except Exception as e:
+            self.kart.text = "Görüntüleme Hatası"
+
     def cevir(self, i): self.cevrildi = not self.cevrildi; self.guncelle()
     def ileri(self, i): 
         if getattr(self,'akt',None): self.gec.append({"v":self.akt,"y":self.y})
-        if YONETICI.veriler: self.akt=random.choice(YONETICI.veriler); self.y=random.choice(["tr_to_en","en_to_tr"]); self.aktif=self.akt; self.yon=self.y; self.cevrildi=False; self.guncelle()
+        if YONETICI.veriler: 
+            self.akt=random.choice(YONETICI.veriler); self.y=random.choice(["tr_to_en","en_to_tr"]); self.aktif=self.akt; self.yon=self.y; self.cevrildi=False; self.guncelle()
     def geri(self, i): 
         if self.gec: s=self.gec.pop(); self.aktif=s["v"]; self.yon=s["y"]; self.cevrildi=False; self.guncelle()
 
