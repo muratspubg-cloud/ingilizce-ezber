@@ -16,7 +16,7 @@ from plyer import tts
 
 # --- AYARLAR ---
 # Google Sheets "CSV" linkini buraya yapıştır. Yoksa boş kalsın.
-CSV_URL = "LINK_YOK" 
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv" 
 
 Window.clearcolor = (0.1, 0.1, 0.1, 1)
 
