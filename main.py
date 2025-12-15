@@ -20,11 +20,10 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bn
 
 Window.clearcolor = (0.1, 0.1, 0.1, 1)
 
-# Yedek veriler (İnternet yoksa devreye girer)
+# Yedek veriler (İnternet/Dosya yoksa devreye girer)
 YEDEK_VERILER = [
     {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
-    {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"},
-    {"tr": "Elma", "en": "Apple", "ipa": "", "okunus": "epıl", "cen": "I like apple", "ctr": "Elma severim"}
+    {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"}
 ]
 
 class VeriYoneticisi:
@@ -42,6 +41,7 @@ class VeriYoneticisi:
         
         yol = os.path.join(klasor, 'kelimeler.csv')
         
+        # Eğer çalışma alanında yoksa kopyalamayı dene
         if not os.path.exists(yol) and os.path.exists('kelimeler.csv'):
             try: shutil.copy('kelimeler.csv', yol)
             except: pass
@@ -60,18 +60,22 @@ class VeriYoneticisi:
             return False, f"Hata: {str(e)}"
 
     def temizle(self, metin):
-        """Metindeki \n ve gereksiz karakterleri temizler"""
+        """Metindeki \n, \\n ve gereksiz karakterleri AGRESİF şekilde temizler"""
         if not metin: return ""
-        # \n karakterlerini boşluğa çevir
-        metin = metin.replace("\\n", " ").replace("\n", " ").replace("\r", "")
-        # Çift boşlukları tek boşluğa düşür
+        # Önce string'e çevir, sonra temizle
+        metin = str(metin)
+        # Kelime içinde görünen '\n' yazısını sil
+        metin = metin.replace("\\n", " ")
+        # Gerçek satır atlamaları sil
+        metin = metin.replace("\n", " ").replace("\r", " ")
+        # Gereksiz boşlukları (çift boşluk) tek boşluğa düşür ve kenarları kırp
         return " ".join(metin.split())
 
     def yukle(self):
         self.veriler = []
         if os.path.exists(self.dosya_yolu):
             try:
-                # utf-8-sig: Excel'den gelen gizli karakterleri (BOM) temizler
+                # utf-8-sig: Excel BOM karakterini temizler
                 with open(self.dosya_yolu, 'r', encoding='utf-8-sig') as f:
                     content = f.read()
                     if content:
@@ -81,33 +85,24 @@ class VeriYoneticisi:
                         rows = list(reader)
                         
                         start_index = 0
-                        # Başlık satırını atlama kontrolü
+                        # Başlık satırı kontrolü
                         if rows and len(rows[0]) > 0 and ("Sıra" in str(rows[0][0]) or "id" in str(rows[0][0]).lower()):
                             start_index = 1
                         
                         for i in range(start_index, len(rows)):
                             row = rows[i]
-                            
-                            # --- KRİTİK DÜZELTME: BOŞ SATIR KONTROLÜ ---
-                            # Eğer satır boşsa veya yeterli sütun yoksa ASLA listeye alma
-                            if not row or len(row) < 3: 
-                                continue
-                            
-                            # İngilizce veya Türkçe kısmı boşsa o satırı atla (Çökmeyi engeller)
-                            if not row[1].strip() or not row[2].strip():
-                                continue
+                            # Boş veya eksik satırları atla
+                            if not row or len(row) < 3: continue
+                            if not row[1].strip() or not row[2].strip(): continue
 
+                            # Her sütunu temizleyerek al
                             def safe(idx):
                                 val = row[idx] if idx < len(row) else ""
                                 return self.temizle(val)
                             
                             self.veriler.append({
-                                "tr": safe(1), 
-                                "en": safe(2), 
-                                "ipa": safe(3), 
-                                "okunus": safe(4), 
-                                "cen": safe(5), 
-                                "ctr": safe(6)
+                                "tr": safe(1), "en": safe(2), "ipa": safe(3), 
+                                "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
                             })
             except Exception as e:
                 print(f"Yükleme Hatası: {e}")
@@ -121,14 +116,11 @@ class AyarlarEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        
         layout.add_widget(Label(text="Ayarlar", font_size='32sp'))
         
         bilgi = Label(
             text="Ses hızı ayarı, telefonunuzun\n[Ayarlar > Erişilebilirlik > Metin Okuma]\nmenüsünden yapılır.", 
-            font_size='18sp', 
-            color=(0.8,0.8,0.8,1),
-            halign='center'
+            font_size='18sp', color=(0.8,0.8,0.8,1), halign='center'
         )
         layout.add_widget(bilgi)
         
@@ -177,12 +169,8 @@ class AnaMenu(Screen):
             Popup(title='Hata', content=Label(text='Liste Boş! Lütfen güncelleyin.'), size_hint=(0.8, 0.4)).open()
             return
         
-        try:
-            ekran = self.manager.get_screen('calisma')
-            ekran.baslat(mod)
-            self.manager.current = 'calisma'
-        except Exception as e:
-            Popup(title='Hata', content=Label(text=str(e)), size_hint=(0.8, 0.4)).open()
+        self.manager.get_screen('calisma').baslat(mod)
+        self.manager.current = 'calisma'
 
 class InfoEkrani(Screen):
     def __init__(self, **kwargs):
@@ -202,7 +190,13 @@ class InfoEkrani(Screen):
 class Calisma(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.gecmis, self.aktif, self.yon, self.cevrildi = [], None, "tr_to_en", False
+        # HATA DÜZELTME: self.gec değil self.gecmis kullanıyoruz
+        self.gecmis = []
+        self.aktif = None
+        self.yon = "tr_to_en"
+        self.cevrildi = False
+        self.mod = "kelime"
+        
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
         
         self.kart = Button(text="Başla", font_size='24sp', halign='center', valign='middle')
@@ -216,10 +210,14 @@ class Calisma(Screen):
         btns.add_widget(Button(text="Menü", on_press=lambda x: setattr(self.manager, 'current', 'menu')))
         btns.add_widget(Button(text="İleri", on_press=self.ileri))
         
-        layout.add_widget(self.kart); layout.add_widget(self.btn_ses); layout.add_widget(btns); self.add_widget(layout)
+        layout.add_widget(self.kart)
+        layout.add_widget(self.btn_ses)
+        layout.add_widget(btns)
+        self.add_widget(layout)
 
     def baslat(self, mod): 
-        self.mod = mod; self.gecmis = []
+        self.mod = mod
+        self.gecmis = []
         if YONETICI.veriler: self.ileri(None)
     
     def seslendir(self, i):
@@ -238,40 +236,44 @@ class Calisma(Screen):
                 self.kart.background_color = get_color_from_hex('#455A64')
                 soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
                 ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
-                self.kart.text = f"[b]{soru}[/b]\\n\\n\\n[size=18]{ipucu}[/size]"
+                
+                # Soru kısmında artık \n görmeyeceksin, temizledik.
+                self.kart.text = f"[b]{soru}[/b]\n\n\n[size=18]{ipucu}[/size]"
             else:
                 self.kart.background_color = get_color_from_hex('#FFECB3'); self.kart.color = (0,0,0,1)
                 
                 if self.mod == "kelime":
-                    # \n temizlendiği için burası artık temiz görünecek
-                    self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\\n[{v['okunus']}]\\n---\\n{v['tr']}"
+                    # Okunuş ve cevap
+                    self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\n[{v['okunus']}]\n---\n{v['tr']}"
                 else:
-                    self.kart.text = f"[b]{v['cen']}[/b]\\n---\\n{v['ctr']}"
+                    self.kart.text = f"[b]{v['cen']}[/b]\n---\n{v['ctr']}"
         except Exception as e:
-            self.kart.text = "Görüntüleme Hatası"
+            self.kart.text = "Hata"
 
     def cevir(self, i): self.cevrildi = not self.cevrildi; self.guncelle()
     
     def ileri(self, i): 
-        # KRİTİK DÜZELTME: Liste kontrolü
         if not YONETICI.veriler: return
         
-        # Geçmişe ekle
-        if getattr(self,'aktif',None): 
-            self.gec.append({"v":self.aktif,"y":self.yon})
+        # Geçmişe kaydet (Hata düzeltildi: self.gecmis kullanıldı)
+        if getattr(self, 'aktif', None): 
+            self.gecmis.append({"v": self.aktif, "y": self.yon})
         
-        # Güvenli Seçim
         try:
             self.aktif = random.choice(YONETICI.veriler)
             self.yon = random.choice(["tr_to_en","en_to_tr"])
             self.cevrildi = False
             self.guncelle()
-        except: 
-            # Hata olursa pas geç, kapanmasın
-            pass
+        except: pass
 
     def geri(self, i): 
-        if self.gec: s=self.gec.pop(); self.aktif=s["v"]; self.yon=s["y"]; self.cevrildi=False; self.guncelle()
+        # Hata düzeltildi: self.gecmis kullanıldı
+        if self.gecmis: 
+            s = self.gecmis.pop()
+            self.aktif = s["v"]
+            self.yon = s["y"]
+            self.cevrildi = False
+            self.guncelle()
 
 class AppMain(App):
     def build(self):
