@@ -32,37 +32,29 @@ YEDEK_VERILER = [
 # --- 3D GÖRÜNÜMLÜ ÖZEL BUTON SINIFI ---
 class OzelButon(Button):
     def __init__(self, **kwargs):
-        # Arka plan rengini al, yoksa varsayılan mavi yap
         self.ana_renk = kwargs.get('background_color', (0.2, 0.6, 0.8, 1))
-        # Kivy'nin standart arka planını kapat (kendimiz çizeceğiz)
         if 'background_color' in kwargs: del kwargs['background_color']
         
         super().__init__(**kwargs)
         self.background_normal = ''
         self.background_down = ''
-        self.background_color = (0, 0, 0, 0) # Tamamen şeffaf
-        self.font_size = '20sp'
+        self.background_color = (0, 0, 0, 0)
+        self.font_size = '22sp' # Buton yazılarını da biraz büyüttük
         self.bold = True
-        self.color = (1, 1, 1, 1) # Yazı rengi beyaz
+        self.color = (1, 1, 1, 1)
         
-        # Çizim işlemleri
         self.bind(pos=self.guncelle_canvas, size=self.guncelle_canvas, state=self.guncelle_canvas)
 
     def guncelle_canvas(self, *args):
         self.canvas.before.clear()
         with self.canvas.before:
-            # 1. GÖLGE KATMANI (3D Efekti veren kısım - Daha koyu)
             r, g, b, a = self.ana_renk
-            Color(r * 0.6, g * 0.6, b * 0.6, 1) # Rengi karart
-            
-            # Buton basılıysa gölge kaybolur (içe göçme efekti)
-            offset = 5 if self.state == 'normal' else 0
+            Color(r * 0.6, g * 0.6, b * 0.6, 1)
+            offset = 6 if self.state == 'normal' else 0 # Gölge derinliğini artırdık
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
 
-            # 2. ANA KATMAN (Üst yüzey)
             Color(r, g, b, 1)
-            # Basılınca hafif aşağı kaydır
-            y_pos = self.y if self.state == 'normal' else self.y - 5
+            y_pos = self.y if self.state == 'normal' else self.y - 6
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
 class SesYoneticisi:
@@ -84,7 +76,6 @@ class SesYoneticisi:
             except: pass
 
     def oku(self, metin):
-        # Kırılmayı önlemek için basit okuma
         try:
             if platform == 'android' and self.tts:
                 self.tts.speak(metin, 0, None)
@@ -162,14 +153,15 @@ class AyarlarEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        layout.add_widget(Label(text="Ayarlar", font_size='28sp', size_hint=(1, 0.2)))
+        layout.add_widget(Label(text="Ayarlar", font_size='28sp', size_hint=(1, 0.3)))
         
         layout.add_widget(Label(text="Ses hızı ayarı cihazınızın\n[Ayarlar > Erişilebilirlik]\nmenüsünden yapılır.", 
                                 halign='center', color=(0.8,0.8,0.8,1)))
         
-        layout.add_widget(Label(size_hint=(1, 0.4))) # Boşluk
+        layout.add_widget(Label(size_hint=(1, 0.3)))
         
-        btn_geri = OzelButon(text="Ana Menüye Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=75)
+        # %50 BÜYÜTÜLMÜŞ BUTON (75 * 1.5 = 112)
+        btn_geri = OzelButon(text="Ana Menüye Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=112)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
         self.add_widget(layout)
@@ -179,21 +171,23 @@ class AyarlarEkrani(Screen):
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        layout = BoxLayout(orientation='vertical', padding=40, spacing=15)
-        layout.add_widget(Label(text="İngilizce Ezber", font_size='40sp', bold=True, size_hint=(1, 0.3)))
+        layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
+        layout.add_widget(Label(text="İngilizce Ezber", font_size='40sp', bold=True, size_hint=(1, 0.2)))
         
-        # BUTONLARIN HEPSİ EŞİT BOYUTTA (height=75)
-        btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=75)
+        # BUTONLAR %50 BÜYÜTÜLDÜ (Eski: 75 -> Yeni: 112)
+        HEDEF_YUKSEKLIK = 112
+        
+        btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.gecis("kelime"))
         
-        btn2 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=75)
+        btn2 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn2.bind(on_press=lambda x: self.gecis("cumle"))
         
-        btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=75)
+        btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
         
-        # AYARLAR VE INFO (Yan yana)
-        grid = GridLayout(cols=2, spacing=15, size_hint=(1, None), height=75)
+        # AYARLAR VE INFO
+        grid = GridLayout(cols=2, spacing=15, size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         b_ayar = OzelButon(text="Ayarlar", background_color=(0.5,0.5,0.5,1))
         b_ayar.bind(on_press=lambda x: setattr(self.manager, 'current', 'ayarlar'))
         b_info = OzelButon(text="Info", background_color=(0,0.8,0.8,1))
@@ -201,7 +195,7 @@ class AnaMenu(Screen):
         grid.add_widget(b_ayar)
         grid.add_widget(b_info)
         
-        btn5 = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=75)
+        btn5 = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn5.bind(on_press=lambda x: sys.exit())
         
         layout.add_widget(btn1)
@@ -210,8 +204,7 @@ class AnaMenu(Screen):
         layout.add_widget(grid)
         layout.add_widget(btn5)
         
-        # Alttan boşluk
-        layout.add_widget(Label(size_hint=(1, 0.1))) 
+        layout.add_widget(Label(size_hint=(1, 0.05))) 
         self.add_widget(layout)
 
     def guncelle(self, i):
@@ -231,7 +224,8 @@ class InfoEkrani(Screen):
         self.lbl = Label(text="...", font_size='22sp', halign='center')
         layout.add_widget(self.lbl)
         
-        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=75)
+        # %50 BÜYÜTÜLMÜŞ BUTON
+        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=112)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
         self.add_widget(layout)
@@ -247,15 +241,19 @@ class Calisma(Screen):
         self.gecmis, self.aktif, self.yon, self.cevrildi = [], None, "tr_to_en", False
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
         
-        # Kart (Kendi özel stili var ama OzelButon yapısını kullanacağız)
+        # KART AYARLARI (Yazı boyutu eşitlendi)
         self.kart = OzelButon(text="Başla", background_color=get_color_from_hex('#455A64'))
-        self.kart.font_size = '26sp' # Kart yazısı büyük olsun
+        
+        # --- ÖNEMLİ DEĞİŞİKLİK: FONT SABİTLENDİ ---
+        self.kart.font_size = '22sp' # Tüm kart yazıları için sabit boyut (En az 12 istendi, 22 yaptık)
         self.kart.bind(on_press=self.cevir)
         
-        self.btn_ses = OzelButon(text="🔊 DİNLE", background_color=(0.4, 0.4, 0.4, 1), size_hint=(1, None), height=60)
+        # SES BUTONU (60 -> 90)
+        self.btn_ses = OzelButon(text="🔊 DİNLE", background_color=(0.4, 0.4, 0.4, 1), size_hint=(1, None), height=90)
         self.btn_ses.bind(on_press=self.seslendir)
         
-        btns = GridLayout(cols=3, spacing=15, size_hint=(1, None), height=70)
+        # NAVİGASYON BUTONLARI (70 -> 105)
+        btns = GridLayout(cols=3, spacing=15, size_hint=(1, None), height=105)
         b1 = OzelButon(text="Geri", background_color=(1,0.6,0,1))
         b1.bind(on_press=self.geri)
         b2 = OzelButon(text="Menü", background_color=(0.8,0.2,0.2,1))
@@ -277,21 +275,25 @@ class Calisma(Screen):
     def guncelle(self):
         self.kart.markup = True; v = self.aktif
         if not v: return
+        
         if not self.cevrildi:
-            # Ön Yüz Rengi (Koyu Gri Mavi)
             self.kart.ana_renk = get_color_from_hex('#37474F')
-            self.kart.guncelle_canvas() # Rengi uygula
+            self.kart.guncelle_canvas()
             self.kart.color = (1,1,1,1)
             soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
             ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
-            self.kart.text = f"[b]{soru}[/b]\n\n\n[size=18]{ipucu}[/size]"
+            
+            # --- FONT BOYUTU SABİT ---
+            # [size=...] etiketlerini kaldırdık. Kartın kendi '22sp' ayarı geçerli olacak.
+            self.kart.text = f"[b]{soru}[/b]\n\n\n{ipucu}"
         else:
-            # Arka Yüz Rengi (Krem/Sarı)
             self.kart.ana_renk = get_color_from_hex('#FBC02D')
-            self.kart.guncelle_canvas() # Rengi uygula
-            self.kart.color = (0,0,0,1) # Siyah yazı
+            self.kart.guncelle_canvas()
+            self.kart.color = (0,0,0,1)
+            
             if self.mod == "kelime":
-                self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\n[{v['okunus']}]\n---\n{v['tr']}"
+                # [size=...] etiketleri kaldırıldı
+                self.kart.text = f"[b]{v['en']}[/b]\n[{v['okunus']}]\n---\n{v['tr']}"
             else:
                 self.kart.text = f"[b]{v['cen']}[/b]\n---\n{v['ctr']}"
 
