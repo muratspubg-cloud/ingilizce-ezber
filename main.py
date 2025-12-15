@@ -11,23 +11,20 @@ from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
-from kivy.uix.togglebutton import ToggleButton
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
 from plyer import tts
 
 # --- AYARLAR ---
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv" 
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv"
 
 Window.clearcolor = (0.1, 0.1, 0.1, 1)
 
-# CSV Okunamazsa kullanılacak yedek veriler (Çökmeyi engeller)
+# Yedek veriler (İnternet yoksa devreye girer)
 YEDEK_VERILER = [
     {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
     {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"},
-    {"tr": "Elma", "en": "Apple", "ipa": "", "okunus": "epıl", "cen": "I like apple", "ctr": "Elma severim"},
-    {"tr": "Kitap", "en": "Book", "ipa": "", "okunus": "buk", "cen": "Read a book", "ctr": "Kitap oku"},
-    {"tr": "Su", "en": "Water", "ipa": "", "okunus": "votır", "cen": "Drink water", "ctr": "Su iç"}
+    {"tr": "Elma", "en": "Apple", "ipa": "", "okunus": "epıl", "cen": "I like apple", "ctr": "Elma severim"}
 ]
 
 class VeriYoneticisi:
@@ -52,7 +49,7 @@ class VeriYoneticisi:
 
     def internetten_guncelle(self):
         try:
-            if "http" not in CSV_URL: return False, "Link Girilmemiş!"
+            if "http" not in CSV_URL: return False, "Link Hatalı!"
             response = requests.get(CSV_URL, timeout=15)
             response.raise_for_status()
             with open(self.dosya_yolu, 'wb') as f:
@@ -62,13 +59,20 @@ class VeriYoneticisi:
         except Exception as e:
             return False, f"Hata: {str(e)}"
 
+    def temizle(self, metin):
+        """Metindeki \n ve gereksiz karakterleri temizler"""
+        if not metin: return ""
+        # \n karakterlerini boşluğa çevir
+        metin = metin.replace("\\n", " ").replace("\n", " ").replace("\r", "")
+        # Çift boşlukları tek boşluğa düşür
+        return " ".join(metin.split())
+
     def yukle(self):
         self.veriler = []
-        
-        # 1. Yöntem: Dosyadan Oku
         if os.path.exists(self.dosya_yolu):
             try:
-                with open(self.dosya_yolu, 'r', encoding='utf-8') as f:
+                # utf-8-sig: Excel'den gelen gizli karakterleri (BOM) temizler
+                with open(self.dosya_yolu, 'r', encoding='utf-8-sig') as f:
                     content = f.read()
                     if content:
                         delimiter = ';' if ';' in content.splitlines()[0] else ','
@@ -76,28 +80,39 @@ class VeriYoneticisi:
                         reader = csv.reader(f, delimiter=delimiter)
                         rows = list(reader)
                         
-                        start = 0
-                        if rows and len(rows[0]) > 0 and "Sıra" in str(rows[0][0]):
-                            start = 1
+                        start_index = 0
+                        # Başlık satırını atlama kontrolü
+                        if rows and len(rows[0]) > 0 and ("Sıra" in str(rows[0][0]) or "id" in str(rows[0][0]).lower()):
+                            start_index = 1
                         
-                        for i in range(start, len(rows)):
+                        for i in range(start_index, len(rows)):
                             row = rows[i]
-                            if len(row) < 2: continue
                             
-                            def safe(idx): 
+                            # --- KRİTİK DÜZELTME: BOŞ SATIR KONTROLÜ ---
+                            # Eğer satır boşsa veya yeterli sütun yoksa ASLA listeye alma
+                            if not row or len(row) < 3: 
+                                continue
+                            
+                            # İngilizce veya Türkçe kısmı boşsa o satırı atla (Çökmeyi engeller)
+                            if not row[1].strip() or not row[2].strip():
+                                continue
+
+                            def safe(idx):
                                 val = row[idx] if idx < len(row) else ""
-                                return val.replace("\\n", " ").strip()
+                                return self.temizle(val)
                             
                             self.veriler.append({
-                                "tr": safe(1), "en": safe(2), "ipa": safe(3), 
-                                "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
+                                "tr": safe(1), 
+                                "en": safe(2), 
+                                "ipa": safe(3), 
+                                "okunus": safe(4), 
+                                "cen": safe(5), 
+                                "ctr": safe(6)
                             })
             except Exception as e:
-                print(f"CSV Okuma Hatası: {e}")
+                print(f"Yükleme Hatası: {e}")
 
-        # 2. Yöntem: Eğer liste boş kaldıysa YEDEK verileri yükle
         if not self.veriler:
-            print("CSV boş veya hatalı, yedek veriler yükleniyor...")
             self.veriler = YEDEK_VERILER.copy()
 
 YONETICI = VeriYoneticisi()
@@ -106,8 +121,16 @@ class AyarlarEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        layout.add_widget(Label(text="Ayarlar", font_size='28sp'))
-        layout.add_widget(Label(text="Ses hızı ayarı cihazın kendi\nmetin okuma (TTS) ayarlarından yapılır.", font_size='16sp', color=(0.7,0.7,0.7,1)))
+        
+        layout.add_widget(Label(text="Ayarlar", font_size='32sp'))
+        
+        bilgi = Label(
+            text="Ses hızı ayarı, telefonunuzun\n[Ayarlar > Erişilebilirlik > Metin Okuma]\nmenüsünden yapılır.", 
+            font_size='18sp', 
+            color=(0.8,0.8,0.8,1),
+            halign='center'
+        )
+        layout.add_widget(bilgi)
         
         btn_geri = Button(text="Ana Menüye Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, 0.2))
         btn_geri.bind(on_press=self.don)
@@ -143,15 +166,15 @@ class AnaMenu(Screen):
         self.add_widget(layout)
 
     def guncelle(self, instance):
-        p = Popup(title='İşlem', content=Label(text='İndiriliyor...'), size_hint=(0.6, 0.3)); p.open()
+        p = Popup(title='İşlem', content=Label(text='İndiriliyor...'), size_hint=(0.6, 0.3))
+        p.open()
         basari, msj = YONETICI.internetten_guncelle()
         p.dismiss()
         Popup(title='Durum', content=Label(text=msj), size_hint=(0.8, 0.4)).open()
 
     def gecis(self, mod):
-        # KRİTİK KONTROL: Veri yoksa çökme, uyarı ver
         if not YONETICI.veriler:
-            Popup(title='Hata', content=Label(text='Veri Yüklenemedi!'), size_hint=(0.8, 0.4)).open()
+            Popup(title='Hata', content=Label(text='Liste Boş! Lütfen güncelleyin.'), size_hint=(0.8, 0.4)).open()
             return
         
         try:
@@ -172,10 +195,9 @@ class InfoEkrani(Screen):
         layout.add_widget(btn)
         self.add_widget(layout)
     def on_pre_enter(self):
-        # Güvenli sayı kontrolü
-        sayi = len(YONETICI.veriler) if YONETICI.veriler else 0
+        sayi = len(YONETICI.veriler)
         kaynak = "Yedek Veri" if YONETICI.veriler == YEDEK_VERILER else "CSV Dosyası"
-        self.lbl.text = f"Kelime Sayısı:\\n{sayi}\\n\\nKaynak:\\n{kaynak}"
+        self.lbl.text = f"Kelime Sayısı:\\n{sayi}\\n\\nVeri Kaynağı:\\n{kaynak}"
 
 class Calisma(Screen):
     def __init__(self, **kwargs):
@@ -198,14 +220,11 @@ class Calisma(Screen):
 
     def baslat(self, mod): 
         self.mod = mod; self.gecmis = []
-        # Eğer veri yoksa başlatma
-        if not YONETICI.veriler: return
-        self.ileri(None)
+        if YONETICI.veriler: self.ileri(None)
     
     def seslendir(self, i):
         if self.aktif:
             try:
-                # Güvenli seslendirme (sadece plyer)
                 text = self.aktif['en'] if self.mod == "kelime" else self.aktif['cen']
                 if text: tts.speak(text)
             except: pass
@@ -213,7 +232,7 @@ class Calisma(Screen):
     def guncelle(self):
         try:
             self.kart.markup = True; v = self.aktif
-            if not v: return # Veri yoksa işlem yapma
+            if not v: return
 
             if not self.cevrildi:
                 self.kart.background_color = get_color_from_hex('#455A64')
@@ -224,26 +243,32 @@ class Calisma(Screen):
                 self.kart.background_color = get_color_from_hex('#FFECB3'); self.kart.color = (0,0,0,1)
                 
                 if self.mod == "kelime":
-                    # IPA kaldırdık, sadece okunuş
+                    # \n temizlendiği için burası artık temiz görünecek
                     self.kart.text = f"[size=32][b]{v['en']}[/b][/size]\\n[{v['okunus']}]\\n---\\n{v['tr']}"
                 else:
                     self.kart.text = f"[b]{v['cen']}[/b]\\n---\\n{v['ctr']}"
         except Exception as e:
-            self.kart.text = "Hata"
+            self.kart.text = "Görüntüleme Hatası"
 
     def cevir(self, i): self.cevrildi = not self.cevrildi; self.guncelle()
     
     def ileri(self, i): 
-        if not YONETICI.veriler: return # Liste boşsa dur
+        # KRİTİK DÜZELTME: Liste kontrolü
+        if not YONETICI.veriler: return
         
-        if getattr(self,'aktif',None): self.gec.append({"v":self.aktif,"y":self.yon})
+        # Geçmişe ekle
+        if getattr(self,'aktif',None): 
+            self.gec.append({"v":self.aktif,"y":self.yon})
         
+        # Güvenli Seçim
         try:
             self.aktif = random.choice(YONETICI.veriler)
             self.yon = random.choice(["tr_to_en","en_to_tr"])
             self.cevrildi = False
             self.guncelle()
-        except: pass
+        except: 
+            # Hata olursa pas geç, kapanmasın
+            pass
 
     def geri(self, i): 
         if self.gec: s=self.gec.pop(); self.aktif=s["v"]; self.yon=s["y"]; self.cevrildi=False; self.guncelle()
