@@ -4,7 +4,7 @@ import os
 import sys
 import requests
 import shutil
-import re  # EKLENDİ: Parantez içlerini temizlemek için gerekli
+import re
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -24,13 +24,18 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bn
 # Arka plan rengi (Koyu Gri)
 Window.clearcolor = (0.15, 0.15, 0.15, 1)
 
+# Global Ayarlar
+AYARLAR = {
+    "hiz": 1.0  # Varsayılan Normal
+}
+
 # Yedek veriler
 YEDEK_VERILER = [
     {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
     {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"}
 ]
 
-# --- 3D GÖRÜNÜMLÜ ÖZEL BUTON SINIFI ---
+# --- 3D GÖRÜNÜMLÜ ÖZEL BUTON ---
 class OzelButon(Button):
     def __init__(self, **kwargs):
         self.ana_renk = kwargs.get('background_color', (0.2, 0.6, 0.8, 1))
@@ -44,16 +49,25 @@ class OzelButon(Button):
         self.bold = True
         self.color = (1, 1, 1, 1)
         
+        # Metin Kaydırma Ayarları (Varsayılan)
+        self.halign = 'center'
+        self.valign = 'middle'
+        self.text_size = (self.width, None) # Başlangıç
+        
         self.bind(pos=self.guncelle_canvas, size=self.guncelle_canvas, state=self.guncelle_canvas)
 
     def guncelle_canvas(self, *args):
+        # Metni butonun içine sığdır (Kenarlardan 20px boşluk bırak)
+        self.text_size = (self.width - 20, None)
+        
         self.canvas.before.clear()
         with self.canvas.before:
             r, g, b, a = self.ana_renk
+            # Gölge
             Color(r * 0.6, g * 0.6, b * 0.6, 1)
             offset = 6 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
-
+            # Ana Yüzey
             Color(r, g, b, 1)
             y_pos = self.y if self.state == 'normal' else self.y - 6
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
@@ -61,27 +75,29 @@ class OzelButon(Button):
 class SesYoneticisi:
     def __init__(self):
         self.tts = None
+        self.android_tts = None
+        
         if platform == 'android':
             try:
                 from jnius import autoclass
                 PythonActivity = autoclass('org.kivy.android.PythonActivity')
                 TextToSpeech = autoclass('android.speech.tts.TextToSpeech')
                 Locale = autoclass('java.util.Locale')
-                self.tts = TextToSpeech(PythonActivity.mActivity, None)
-                self.tts.setLanguage(Locale.US)
-            except: pass
-        else:
-            try:
-                from plyer import tts
-                self.plyer_tts = tts
+                self.android_tts = TextToSpeech(PythonActivity.mActivity, None)
+                self.android_tts.setLanguage(Locale.US)
             except: pass
 
     def oku(self, metin):
+        hiz = AYARLAR["hiz"]
         try:
-            if platform == 'android' and self.tts:
-                self.tts.speak(metin, 0, None)
+            if platform == 'android' and self.android_tts:
+                # Android Native Hız Ayarı
+                self.android_tts.setSpeechRate(float(hiz))
+                self.android_tts.speak(metin, 0, None)
             else:
-                self.plyer_tts.speak(metin)
+                # PC / Standart Plyer (Hız ayarı desteklemeyebilir ama okur)
+                # Plyer doğrudan hız ayarı desteklemez, standart okur.
+                tts.speak(metin)
         except: pass
 
 SES = SesYoneticisi()
@@ -154,19 +170,46 @@ class AyarlarEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        layout.add_widget(Label(text="Ayarlar", font_size='28sp', size_hint=(1, 0.3)))
         
-        layout.add_widget(Label(text="Ses hızı ayarı cihazınızın\n[Ayarlar > Erişilebilirlik]\nmenüsünden yapılır.", 
-                                halign='center', color=(0.8,0.8,0.8,1)))
+        layout.add_widget(Label(text="Konuşma Hızı", font_size='32sp', size_hint=(1, 0.2)))
         
-        layout.add_widget(Label(size_hint=(1, 0.3)))
+        # HIZ BUTONLARI (0.75 - 1.0 - 1.25)
+        grid = GridLayout(cols=3, spacing=10, size_hint=(1, 0.2))
         
-        btn_geri = OzelButon(text="Ana Menüye Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=112)
+        self.btn_yavas = ToggleButton(text="Yavaş\n(0.75x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
+        self.btn_normal = ToggleButton(text="Normal\n(1.0x)", group='hiz', state='down', background_color=(0.2, 0.6, 0.8, 1))
+        self.btn_hizli = ToggleButton(text="Hızlı\n(1.25x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
+        
+        self.btn_yavas.bind(on_press=lambda x: self.hiz_set(0.75))
+        self.btn_normal.bind(on_press=lambda x: self.hiz_set(1.0))
+        self.btn_hizli.bind(on_press=lambda x: self.hiz_set(1.25))
+        
+        grid.add_widget(self.btn_yavas)
+        grid.add_widget(self.btn_normal)
+        grid.add_widget(self.btn_hizli)
+        
+        layout.add_widget(grid)
+        layout.add_widget(Label(size_hint=(1, 0.4))) # Boşluk
+        
+        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=112)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
+        
         self.add_widget(layout)
 
-    def don(self, instance): self.manager.current = 'menu'
+    def hiz_set(self, deger):
+        AYARLAR["hiz"] = deger
+        # Renk güncelleme
+        def renk(btn, aktif):
+            btn.background_color = (0.2, 0.6, 0.8, 1) if aktif else (0.3, 0.3, 0.3, 1)
+        renk(self.btn_yavas, deger == 0.75)
+        renk(self.btn_normal, deger == 1.0)
+        renk(self.btn_hizli, deger == 1.25)
+        # Test Sesi
+        SES.oku("Test speed")
+
+    def don(self, instance):
+        self.manager.current = 'menu'
 
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
@@ -201,7 +244,6 @@ class AnaMenu(Screen):
         layout.add_widget(btn3)
         layout.add_widget(grid)
         layout.add_widget(btn5)
-        
         layout.add_widget(Label(size_hint=(1, 0.05))) 
         self.add_widget(layout)
 
@@ -226,13 +268,9 @@ class InfoEkrani(Screen):
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
         self.add_widget(layout)
-    
     def on_pre_enter(self):
         s = len(YONETICI.veriler)
-        # --- İSTEK ÜZERİNE DÜZENLENDİ ---
-        # Sadece Toplam Kelime: "sayı" şeklinde gösterim
         self.lbl.text = f'Toplam Kelime: "{s}"'
-        self.lbl.markup = True
 
 class Calisma(Screen):
     def __init__(self, **kwargs):
@@ -266,26 +304,30 @@ class Calisma(Screen):
     
     def seslendir(self, i):
         if self.aktif: 
-            # --- İSTEK ÜZERİNE DÜZENLENDİ: Parantez Temizliği ---
             ham_metin = self.aktif['en'] if self.mod=="kelime" else self.aktif['cen']
-            # Regex ile parantez ve içindekileri sil (örn: "clever (adj.)" -> "clever")
+            # Parantez içlerini sil (Regex)
             temiz_metin = re.sub(r"\(.*?\)", "", ham_metin).strip()
             SES.oku(temiz_metin)
             
     def guncelle(self):
         self.kart.markup = True; v = self.aktif
         if not v: return
+        
         if not self.cevrildi:
             self.kart.ana_renk = get_color_from_hex('#37474F')
             self.kart.guncelle_canvas()
             self.kart.color = (1,1,1,1)
             soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
             ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
+            
+            # --- METİN KAYDIRMA DÜZELTMESİ YAPILDI ---
+            # OzelButon sınıfı artık text_size ile otomatik kaydırıyor
             self.kart.text = f"[b]{soru}[/b]\n\n\n{ipucu}"
         else:
             self.kart.ana_renk = get_color_from_hex('#FBC02D')
             self.kart.guncelle_canvas()
             self.kart.color = (0,0,0,1)
+            
             if self.mod == "kelime":
                 self.kart.text = f"[b]{v['en']}[/b]\n[{v['okunus']}]\n---\n{v['tr']}"
             else:
