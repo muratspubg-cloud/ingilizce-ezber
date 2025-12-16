@@ -5,8 +5,10 @@ package.domain = com.ingilizce
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,csv
 
-# İKON AYARI
+# --- LOGO AYARLARI ---
 icon.filename = %(source.dir)s/icon.png
+# Açılış ekranında da aynı logoyu göster
+presplash.filename = %(source.dir)s/icon.png
 
 version = 0.1
 requirements = python3,kivy==2.3.0,requests,openssl,plyer,pyjnius,urllib3,chardet,idna,certifi
