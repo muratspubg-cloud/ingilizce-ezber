@@ -49,25 +49,21 @@ class OzelButon(Button):
         self.bold = True
         self.color = (1, 1, 1, 1)
         
-        # Metin Kaydırma Ayarları (Varsayılan)
         self.halign = 'center'
         self.valign = 'middle'
-        self.text_size = (self.width, None) # Başlangıç
+        self.text_size = (self.width, None)
         
         self.bind(pos=self.guncelle_canvas, size=self.guncelle_canvas, state=self.guncelle_canvas)
 
     def guncelle_canvas(self, *args):
-        # Metni butonun içine sığdır (Kenarlardan 20px boşluk bırak)
         self.text_size = (self.width - 20, None)
         
         self.canvas.before.clear()
         with self.canvas.before:
             r, g, b, a = self.ana_renk
-            # Gölge
             Color(r * 0.6, g * 0.6, b * 0.6, 1)
             offset = 6 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
-            # Ana Yüzey
             Color(r, g, b, 1)
             y_pos = self.y if self.state == 'normal' else self.y - 6
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
@@ -91,12 +87,9 @@ class SesYoneticisi:
         hiz = AYARLAR["hiz"]
         try:
             if platform == 'android' and self.android_tts:
-                # Android Native Hız Ayarı
                 self.android_tts.setSpeechRate(float(hiz))
                 self.android_tts.speak(metin, 0, None)
             else:
-                # PC / Standart Plyer (Hız ayarı desteklemeyebilir ama okur)
-                # Plyer doğrudan hız ayarı desteklemez, standart okur.
                 tts.speak(metin)
         except: pass
 
@@ -173,7 +166,6 @@ class AyarlarEkrani(Screen):
         
         layout.add_widget(Label(text="Konuşma Hızı", font_size='32sp', size_hint=(1, 0.2)))
         
-        # HIZ BUTONLARI (0.75 - 1.0 - 1.25)
         grid = GridLayout(cols=3, spacing=10, size_hint=(1, 0.2))
         
         self.btn_yavas = ToggleButton(text="Yavaş\n(0.75x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
@@ -189,7 +181,7 @@ class AyarlarEkrani(Screen):
         grid.add_widget(self.btn_hizli)
         
         layout.add_widget(grid)
-        layout.add_widget(Label(size_hint=(1, 0.4))) # Boşluk
+        layout.add_widget(Label(size_hint=(1, 0.4))) 
         
         btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=112)
         btn_geri.bind(on_press=self.don)
@@ -199,13 +191,11 @@ class AyarlarEkrani(Screen):
 
     def hiz_set(self, deger):
         AYARLAR["hiz"] = deger
-        # Renk güncelleme
         def renk(btn, aktif):
             btn.background_color = (0.2, 0.6, 0.8, 1) if aktif else (0.3, 0.3, 0.3, 1)
         renk(self.btn_yavas, deger == 0.75)
         renk(self.btn_normal, deger == 1.0)
         renk(self.btn_hizli, deger == 1.25)
-        # Test Sesi
         SES.oku("Test speed")
 
     def don(self, instance):
@@ -244,6 +234,7 @@ class AnaMenu(Screen):
         layout.add_widget(btn3)
         layout.add_widget(grid)
         layout.add_widget(btn5)
+        
         layout.add_widget(Label(size_hint=(1, 0.05))) 
         self.add_widget(layout)
 
@@ -261,13 +252,24 @@ class InfoEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         layout = BoxLayout(orientation='vertical', padding=40, spacing=20)
-        self.lbl = Label(text="...", font_size='22sp', halign='center')
+        self.lbl = Label(text="...", font_size='22sp', halign='center', size_hint=(1, 0.6))
         layout.add_widget(self.lbl)
+        
+        # --- İMZA KISMI EKLENDİ ---
+        imza = Label(
+            text="Hazırlayan: Murat SERT", 
+            font_size='16sp', 
+            color=(0.7, 0.7, 0.7, 1), 
+            size_hint=(1, 0.1)
+        )
+        layout.add_widget(imza)
         
         btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=112)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
+        
         self.add_widget(layout)
+    
     def on_pre_enter(self):
         s = len(YONETICI.veriler)
         self.lbl.text = f'Toplam Kelime: "{s}"'
@@ -305,7 +307,6 @@ class Calisma(Screen):
     def seslendir(self, i):
         if self.aktif: 
             ham_metin = self.aktif['en'] if self.mod=="kelime" else self.aktif['cen']
-            # Parantez içlerini sil (Regex)
             temiz_metin = re.sub(r"\(.*?\)", "", ham_metin).strip()
             SES.oku(temiz_metin)
             
@@ -319,9 +320,6 @@ class Calisma(Screen):
             self.kart.color = (1,1,1,1)
             soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
             ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
-            
-            # --- METİN KAYDIRMA DÜZELTMESİ YAPILDI ---
-            # OzelButon sınıfı artık text_size ile otomatik kaydırıyor
             self.kart.text = f"[b]{soru}[/b]\n\n\n{ipucu}"
         else:
             self.kart.ana_renk = get_color_from_hex('#FBC02D')
