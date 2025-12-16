@@ -4,6 +4,7 @@ import os
 import sys
 import requests
 import shutil
+import re  # EKLENDİ: Parantez içlerini temizlemek için gerekli
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -39,7 +40,7 @@ class OzelButon(Button):
         self.background_normal = ''
         self.background_down = ''
         self.background_color = (0, 0, 0, 0)
-        self.font_size = '22sp' # Buton yazılarını da biraz büyüttük
+        self.font_size = '22sp'
         self.bold = True
         self.color = (1, 1, 1, 1)
         
@@ -50,7 +51,7 @@ class OzelButon(Button):
         with self.canvas.before:
             r, g, b, a = self.ana_renk
             Color(r * 0.6, g * 0.6, b * 0.6, 1)
-            offset = 6 if self.state == 'normal' else 0 # Gölge derinliğini artırdık
+            offset = 6 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
 
             Color(r, g, b, 1)
@@ -160,7 +161,6 @@ class AyarlarEkrani(Screen):
         
         layout.add_widget(Label(size_hint=(1, 0.3)))
         
-        # %50 BÜYÜTÜLMÜŞ BUTON (75 * 1.5 = 112)
         btn_geri = OzelButon(text="Ana Menüye Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=112)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
@@ -174,7 +174,6 @@ class AnaMenu(Screen):
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
         layout.add_widget(Label(text="İngilizce Ezber", font_size='40sp', bold=True, size_hint=(1, 0.2)))
         
-        # BUTONLAR %50 BÜYÜTÜLDÜ (Eski: 75 -> Yeni: 112)
         HEDEF_YUKSEKLIK = 112
         
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
@@ -186,7 +185,6 @@ class AnaMenu(Screen):
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
         
-        # AYARLAR VE INFO
         grid = GridLayout(cols=2, spacing=15, size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         b_ayar = OzelButon(text="Ayarlar", background_color=(0.5,0.5,0.5,1))
         b_ayar.bind(on_press=lambda x: setattr(self.manager, 'current', 'ayarlar'))
@@ -224,15 +222,16 @@ class InfoEkrani(Screen):
         self.lbl = Label(text="...", font_size='22sp', halign='center')
         layout.add_widget(self.lbl)
         
-        # %50 BÜYÜTÜLMÜŞ BUTON
         btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=112)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
         self.add_widget(layout)
+    
     def on_pre_enter(self):
         s = len(YONETICI.veriler)
-        k = "Yedek" if YONETICI.veriler == YEDEK_VERILER else "CSV Dosyası"
-        self.lbl.text = f"Toplam Kelime:\\n[b]{s}[/b]\\n\\nKaynak:\\n{k}"
+        # --- İSTEK ÜZERİNE DÜZENLENDİ ---
+        # Sadece Toplam Kelime: "sayı" şeklinde gösterim
+        self.lbl.text = f'Toplam Kelime: "{s}"'
         self.lbl.markup = True
 
 class Calisma(Screen):
@@ -241,18 +240,13 @@ class Calisma(Screen):
         self.gecmis, self.aktif, self.yon, self.cevrildi = [], None, "tr_to_en", False
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
         
-        # KART AYARLARI (Yazı boyutu eşitlendi)
         self.kart = OzelButon(text="Başla", background_color=get_color_from_hex('#455A64'))
-        
-        # --- ÖNEMLİ DEĞİŞİKLİK: FONT SABİTLENDİ ---
-        self.kart.font_size = '22sp' # Tüm kart yazıları için sabit boyut (En az 12 istendi, 22 yaptık)
+        self.kart.font_size = '22sp'
         self.kart.bind(on_press=self.cevir)
         
-        # SES BUTONU (60 -> 90)
         self.btn_ses = OzelButon(text="🔊 DİNLE", background_color=(0.4, 0.4, 0.4, 1), size_hint=(1, None), height=90)
         self.btn_ses.bind(on_press=self.seslendir)
         
-        # NAVİGASYON BUTONLARI (70 -> 105)
         btns = GridLayout(cols=3, spacing=15, size_hint=(1, None), height=105)
         b1 = OzelButon(text="Geri", background_color=(1,0.6,0,1))
         b1.bind(on_press=self.geri)
@@ -269,30 +263,30 @@ class Calisma(Screen):
         self.add_widget(layout)
 
     def baslat(self, m): self.mod=m; self.gecmis=[]; self.ileri(None)
+    
     def seslendir(self, i):
-        if self.aktif: SES.oku(self.aktif['en'] if self.mod=="kelime" else self.aktif['cen'])
+        if self.aktif: 
+            # --- İSTEK ÜZERİNE DÜZENLENDİ: Parantez Temizliği ---
+            ham_metin = self.aktif['en'] if self.mod=="kelime" else self.aktif['cen']
+            # Regex ile parantez ve içindekileri sil (örn: "clever (adj.)" -> "clever")
+            temiz_metin = re.sub(r"\(.*?\)", "", ham_metin).strip()
+            SES.oku(temiz_metin)
             
     def guncelle(self):
         self.kart.markup = True; v = self.aktif
         if not v: return
-        
         if not self.cevrildi:
             self.kart.ana_renk = get_color_from_hex('#37474F')
             self.kart.guncelle_canvas()
             self.kart.color = (1,1,1,1)
             soru = (v["tr"] if self.yon == "tr_to_en" else v["en"]) if self.mod == "kelime" else (v["ctr"] if self.yon == "tr_to_en" else v["cen"])
             ipucu = "(Türkçesi?)" if self.yon == "en_to_tr" else "(İngilizcesi?)"
-            
-            # --- FONT BOYUTU SABİT ---
-            # [size=...] etiketlerini kaldırdık. Kartın kendi '22sp' ayarı geçerli olacak.
             self.kart.text = f"[b]{soru}[/b]\n\n\n{ipucu}"
         else:
             self.kart.ana_renk = get_color_from_hex('#FBC02D')
             self.kart.guncelle_canvas()
             self.kart.color = (0,0,0,1)
-            
             if self.mod == "kelime":
-                # [size=...] etiketleri kaldırıldı
                 self.kart.text = f"[b]{v['en']}[/b]\n[{v['okunus']}]\n---\n{v['tr']}"
             else:
                 self.kart.text = f"[b]{v['cen']}[/b]\n---\n{v['ctr']}"
