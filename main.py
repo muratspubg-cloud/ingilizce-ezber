@@ -8,6 +8,7 @@ import re
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.stacklayout import StackLayout
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.button import Button
 from kivy.uix.label import Label
@@ -26,7 +27,7 @@ Window.clearcolor = (0.15, 0.15, 0.15, 1)
 
 # Global Ayarlar
 AYARLAR = {
-    "hiz": 1.0  # Varsayılan Normal
+    "hiz": 1.0
 }
 
 # Yedek veriler
@@ -56,23 +57,36 @@ class OzelButon(Button):
         self.bind(pos=self.guncelle_canvas, size=self.guncelle_canvas, state=self.guncelle_canvas)
 
     def guncelle_canvas(self, *args):
-        self.text_size = (self.width - 20, None)
-        
+        self.text_size = (self.width - 10, None)
         self.canvas.before.clear()
         with self.canvas.before:
             r, g, b, a = self.ana_renk
+            # Gölge
             Color(r * 0.6, g * 0.6, b * 0.6, 1)
             offset = 6 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
+            # Ana Yüzey
             Color(r, g, b, 1)
             y_pos = self.y if self.state == 'normal' else self.y - 6
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
+# --- KELİME PARÇASI BUTONU (Etkinlik İçin) ---
+class KelimeParcasi(Button):
+    def __init__(self, metin, **kwargs):
+        super().__init__(**kwargs)
+        self.text = metin
+        self.font_size = '18sp'
+        self.size_hint = (None, None)
+        self.height = 60
+        # Genişliği metne göre ayarla (min 100)
+        self.width = max(100, len(metin) * 15)
+        self.background_normal = ''
+        self.background_color = (0.3, 0.3, 0.3, 1) # Gri
+        self.color = (1, 1, 1, 1)
+
 class SesYoneticisi:
     def __init__(self):
-        self.tts = None
         self.android_tts = None
-        
         if platform == 'android':
             try:
                 from jnius import autoclass
@@ -107,9 +121,7 @@ class VeriYoneticisi:
             klasor = app_storage_path()
         else:
             klasor = os.getcwd()
-        
         yol = os.path.join(klasor, 'kelimeler.csv')
-        
         if not os.path.exists(yol) and os.path.exists('kelimeler.csv'):
             try: shutil.copy('kelimeler.csv', yol)
             except: pass
@@ -143,13 +155,11 @@ class VeriYoneticisi:
                         reader = csv.reader(f, delimiter=delimiter)
                         rows = list(reader)
                         start = 1 if rows and "Sıra" in str(rows[0][0]) else 0
-                        
                         for i in range(start, len(rows)):
                             row = rows[i]
                             if not row or len(row) < 3: continue
                             if not row[1].strip() or not row[2].strip(): continue
                             def safe(idx): return self.temizle(row[idx]) if idx < len(row) else ""
-                            
                             self.veriler.append({
                                 "tr": safe(1), "en": safe(2), "ipa": safe(3), 
                                 "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
@@ -163,11 +173,9 @@ class AyarlarEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        
         layout.add_widget(Label(text="Konuşma Hızı", font_size='32sp', size_hint=(1, 0.2)))
         
         grid = GridLayout(cols=3, spacing=10, size_hint=(1, 0.2))
-        
         self.btn_yavas = ToggleButton(text="Yavaş\n(0.75x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
         self.btn_normal = ToggleButton(text="Normal\n(1.0x)", group='hiz', state='down', background_color=(0.2, 0.6, 0.8, 1))
         self.btn_hizli = ToggleButton(text="Hızlı\n(1.25x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
@@ -176,30 +184,21 @@ class AyarlarEkrani(Screen):
         self.btn_normal.bind(on_press=lambda x: self.hiz_set(1.0))
         self.btn_hizli.bind(on_press=lambda x: self.hiz_set(1.25))
         
-        grid.add_widget(self.btn_yavas)
-        grid.add_widget(self.btn_normal)
-        grid.add_widget(self.btn_hizli)
-        
+        grid.add_widget(self.btn_yavas); grid.add_widget(self.btn_normal); grid.add_widget(self.btn_hizli)
         layout.add_widget(grid)
         layout.add_widget(Label(size_hint=(1, 0.4))) 
         
         btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=112)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
-        
         self.add_widget(layout)
 
     def hiz_set(self, deger):
         AYARLAR["hiz"] = deger
-        def renk(btn, aktif):
-            btn.background_color = (0.2, 0.6, 0.8, 1) if aktif else (0.3, 0.3, 0.3, 1)
-        renk(self.btn_yavas, deger == 0.75)
-        renk(self.btn_normal, deger == 1.0)
-        renk(self.btn_hizli, deger == 1.25)
+        def renk(btn, aktif): btn.background_color = (0.2, 0.6, 0.8, 1) if aktif else (0.3, 0.3, 0.3, 1)
+        renk(self.btn_yavas, deger == 0.75); renk(self.btn_normal, deger == 1.0); renk(self.btn_hizli, deger == 1.25)
         SES.oku("Test speed")
-
-    def don(self, instance):
-        self.manager.current = 'menu'
+    def don(self, instance): self.manager.current = 'menu'
 
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
@@ -215,6 +214,10 @@ class AnaMenu(Screen):
         btn2 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn2.bind(on_press=lambda x: self.gecis("cumle"))
         
+        # --- YENİ ETKİNLİK BUTONU ---
+        btn_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
+        btn_etkinlik.bind(on_press=lambda x: self.gecis("etkinlik"))
+        
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
         
@@ -223,19 +226,13 @@ class AnaMenu(Screen):
         b_ayar.bind(on_press=lambda x: setattr(self.manager, 'current', 'ayarlar'))
         b_info = OzelButon(text="Info", background_color=(0,0.8,0.8,1))
         b_info.bind(on_press=lambda x: setattr(self.manager, 'current', 'info'))
-        grid.add_widget(b_ayar)
-        grid.add_widget(b_info)
+        grid.add_widget(b_ayar); grid.add_widget(b_info)
         
         btn5 = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn5.bind(on_press=lambda x: sys.exit())
         
-        layout.add_widget(btn1)
-        layout.add_widget(btn2)
-        layout.add_widget(btn3)
-        layout.add_widget(grid)
-        layout.add_widget(btn5)
-        
-        layout.add_widget(Label(size_hint=(1, 0.05))) 
+        layout.add_widget(btn1); layout.add_widget(btn2); layout.add_widget(btn_etkinlik); layout.add_widget(btn3)
+        layout.add_widget(grid); layout.add_widget(btn5)
         self.add_widget(layout)
 
     def guncelle(self, i):
@@ -246,7 +243,13 @@ class AnaMenu(Screen):
     def gecis(self, m):
         if not YONETICI.veriler: 
             Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
-        self.manager.get_screen('calisma').baslat(m); self.manager.current='calisma'
+        
+        if m == "etkinlik":
+            self.manager.get_screen('etkinlik').baslat()
+            self.manager.current = 'etkinlik'
+        else:
+            self.manager.get_screen('calisma').baslat(m)
+            self.manager.current = 'calisma'
 
 class InfoEkrani(Screen):
     def __init__(self, **kwargs):
@@ -254,25 +257,127 @@ class InfoEkrani(Screen):
         layout = BoxLayout(orientation='vertical', padding=40, spacing=20)
         self.lbl = Label(text="...", font_size='22sp', halign='center', size_hint=(1, 0.6))
         layout.add_widget(self.lbl)
-        
-        # --- İMZA KISMI EKLENDİ ---
-        imza = Label(
-            text="Hazırlayan: Murat SERT", 
-            font_size='16sp', 
-            color=(0.7, 0.7, 0.7, 1), 
-            size_hint=(1, 0.1)
-        )
+        imza = Label(text="Hazırlayan: Murat SERT", font_size='16sp', color=(0.7, 0.7, 0.7, 1), size_hint=(1, 0.1))
         layout.add_widget(imza)
-        
         btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=112)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
-        
         self.add_widget(layout)
-    
     def on_pre_enter(self):
         s = len(YONETICI.veriler)
         self.lbl.text = f'Toplam Kelime: "{s}"'
+
+# --- YENİ ETKİNLİK EKRANI (CÜMLE KURMA) ---
+class EtkinlikEkrani(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.aktif_veri = None
+        self.dogru_siralama = []
+        self.kullanici_siralama = []
+        
+        main_layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
+        
+        # 1. ÜST BİLGİ (İpucu)
+        self.lbl_ipucu = Label(text="Cümleyi Oluşturun", font_size='20sp', size_hint=(1, 0.15))
+        main_layout.add_widget(self.lbl_ipucu)
+        
+        # 2. CEVAP ALANI (Kullanıcının kelimeleri taşıdığı yer)
+        self.cevap_kutusu = StackLayout(padding=10, spacing=10, size_hint=(1, 0.25))
+        # Arka plan rengi için canvas ekleyelim
+        with self.cevap_kutusu.canvas.before:
+            Color(0.2, 0.2, 0.2, 1) # Koyu zemin
+            self.rect = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
+        self.cevap_kutusu.bind(pos=self.guncelle_rect, size=self.guncelle_rect)
+        main_layout.add_widget(self.cevap_kutusu)
+        
+        # 3. KELİME HAVUZU (Karışık kelimelerin durduğu yer)
+        self.kelime_havuzu = StackLayout(padding=10, spacing=10, size_hint=(1, 0.35))
+        main_layout.add_widget(self.kelime_havuzu)
+        
+        # 4. KONTROL BUTONLARI
+        btns = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=112)
+        
+        b_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1))
+        b_kontrol.bind(on_press=self.kontrol_et)
+        
+        b_goster = OzelButon(text="Doğruyu Gör", background_color=(1, 0.6, 0, 1))
+        b_goster.bind(on_press=self.dogruyu_goster)
+        
+        btns.add_widget(b_kontrol)
+        btns.add_widget(b_goster)
+        main_layout.add_widget(btns)
+        
+        # 5. ALT NAVİGASYON
+        nav = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=80)
+        b_menu = OzelButon(text="Menü", background_color=(0.5, 0.5, 0.5, 1))
+        b_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
+        b_ileri = OzelButon(text="İleri", background_color=(0.2, 0.6, 0.8, 1))
+        b_ileri.bind(on_press=lambda x: self.baslat())
+        
+        nav.add_widget(b_menu)
+        nav.add_widget(b_ileri)
+        main_layout.add_widget(nav)
+        
+        self.add_widget(main_layout)
+
+    def guncelle_rect(self, instance, value):
+        self.rect.pos = instance.pos
+        self.rect.size = instance.size
+
+    def baslat(self):
+        self.cevap_kutusu.clear_widgets()
+        self.kelime_havuzu.clear_widgets()
+        self.kullanici_siralama = []
+        
+        if not YONETICI.veriler: return
+        
+        # Rastgele cümle seç (Sadece İngilizce cümlesi dolu olanlar)
+        self.aktif_veri = random.choice([v for v in YONETICI.veriler if v.get('cen')])
+        
+        # İpucu (Türkçesi)
+        self.lbl_ipucu.text = f"[b]{self.aktif_veri['ctr']}[/b]"
+        self.lbl_ipucu.markup = True
+        
+        # Cümleyi kelimelere ayır ve temizle
+        cumle = self.aktif_veri['cen']
+        # Noktalama işaretlerini ayır veya temizle (Basit tutmak için temizliyoruz)
+        temiz_cumle = re.sub(r'[^\w\s]', '', cumle) 
+        self.dogru_siralama = temiz_cumle.split()
+        
+        karisik_kelimeler = self.dogru_siralama.copy()
+        random.shuffle(karisik_kelimeler)
+        
+        for kelime in karisik_kelimeler:
+            btn = KelimeParcasi(metin=kelime)
+            btn.bind(on_press=self.kelime_tasima)
+            self.kelime_havuzu.add_widget(btn)
+
+    def kelime_tasima(self, btn):
+        # Eğer havuzdaysa -> Cevaba taşı
+        if btn.parent == self.kelime_havuzu:
+            self.kelime_havuzu.remove_widget(btn)
+            self.cevap_kutusu.add_widget(btn)
+            self.kullanici_siralama.append(btn.text)
+        # Eğer cevaptaysa -> Havuza geri taşı
+        else:
+            self.cevap_kutusu.remove_widget(btn)
+            self.kelime_havuzu.add_widget(btn)
+            if btn.text in self.kullanici_siralama:
+                self.kullanici_siralama.remove(btn.text)
+
+    def kontrol_et(self, instance):
+        if self.kullanici_siralama == self.dogru_siralama:
+            # DOĞRU: Yeşil Tik Sesi ve Popup
+            Popup(title='Tebrikler!', content=Label(text='✅ Doğru Cevap!', font_size='24sp'), size_hint=(0.6, 0.3)).open()
+            SES.oku("Correct!")
+        else:
+            # YANLIŞ
+            Popup(title='Hata', content=Label(text='❌ Yanlış Sıralama\nTekrar Dene', font_size='20sp', halign='center'), size_hint=(0.6, 0.3)).open()
+
+    def dogruyu_goster(self, instance):
+        if self.aktif_veri:
+            Popup(title='Doğru Cümle', content=Label(text=self.aktif_veri['cen'], font_size='20sp', halign='center'), size_hint=(0.8, 0.4)).open()
+            SES.oku(self.aktif_veri['cen'])
 
 class Calisma(Screen):
     def __init__(self, **kwargs):
@@ -296,10 +401,7 @@ class Calisma(Screen):
         b3.bind(on_press=self.ileri)
         
         btns.add_widget(b1); btns.add_widget(b2); btns.add_widget(b3)
-        
-        layout.add_widget(self.kart)
-        layout.add_widget(self.btn_ses)
-        layout.add_widget(btns)
+        layout.add_widget(self.kart); layout.add_widget(self.btn_ses); layout.add_widget(btns)
         self.add_widget(layout)
 
     def baslat(self, m): self.mod=m; self.gecmis=[]; self.ileri(None)
@@ -348,6 +450,7 @@ class AppMain(App):
         sm.add_widget(InfoEkrani(name='info'))
         sm.add_widget(AyarlarEkrani(name='ayarlar'))
         sm.add_widget(Calisma(name='calisma'))
+        sm.add_widget(EtkinlikEkrani(name='etkinlik')) # Etkinlik eklendi
         return sm
 
 if __name__ == '__main__': AppMain().run()
