@@ -49,11 +49,8 @@ class OzelButon(Button):
         self.font_size = '22sp'
         self.bold = True
         self.color = (1, 1, 1, 1)
-        
         self.halign = 'center'
         self.valign = 'middle'
-        self.text_size = (self.width, None)
-        
         self.bind(pos=self.guncelle_canvas, size=self.guncelle_canvas, state=self.guncelle_canvas)
 
     def guncelle_canvas(self, *args):
@@ -61,28 +58,43 @@ class OzelButon(Button):
         self.canvas.before.clear()
         with self.canvas.before:
             r, g, b, a = self.ana_renk
-            # Gölge
-            Color(r * 0.6, g * 0.6, b * 0.6, 1)
+            Color(r * 0.6, g * 0.6, b * 0.6, 1) # Gölge
             offset = 6 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
-            # Ana Yüzey
-            Color(r, g, b, 1)
+            Color(r, g, b, 1) # Ana Yüzey
             y_pos = self.y if self.state == 'normal' else self.y - 6
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
-# --- KELİME PARÇASI BUTONU (Etkinlik İçin) ---
+# --- KELİME PARÇASI BUTONU (DÜZELTİLDİ: FERAH GÖRÜNÜM) ---
 class KelimeParcasi(Button):
     def __init__(self, metin, **kwargs):
         super().__init__(**kwargs)
         self.text = metin
-        self.font_size = '18sp'
+        self.font_size = '20sp' # Yazı büyütüldü
+        self.bold = True
         self.size_hint = (None, None)
-        self.height = 60
-        # Genişliği metne göre ayarla (min 100)
-        self.width = max(100, len(metin) * 15)
+        self.height = 75 # Yükseklik artırıldı (Daha rahat basılsın)
+        
+        # --- GENİŞLİK HESAPLAMASI GÜNCELLENDİ ---
+        # Her harf için daha fazla yer + Kenarlardan 40 birim boşluk
+        # Minimum genişlik 110 birim oldu.
+        self.width = max(110, len(metin) * 22 + 40)
+        
         self.background_normal = ''
-        self.background_color = (0.3, 0.3, 0.3, 1) # Gri
+        self.background_down = ''
+        # Hafif Mavi-Gri bir renk
+        self.background_color = (0.25, 0.35, 0.45, 1) 
         self.color = (1, 1, 1, 1)
+        
+        # Basit bir oval tasarım (3D değil, düz ve temiz)
+        self.bind(pos=self.ciz, size=self.ciz)
+
+    def ciz(self, *args):
+        self.canvas.before.clear()
+        with self.canvas.before:
+            # Arka plan rengi
+            Color(*self.background_color)
+            RoundedRectangle(pos=self.pos, size=self.size, radius=[10])
 
 class SesYoneticisi:
     def __init__(self):
@@ -214,7 +226,6 @@ class AnaMenu(Screen):
         btn2 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn2.bind(on_press=lambda x: self.gecis("cumle"))
         
-        # --- YENİ ETKİNLİK BUTONU ---
         btn_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_etkinlik.bind(on_press=lambda x: self.gecis("etkinlik"))
         
@@ -243,7 +254,6 @@ class AnaMenu(Screen):
     def gecis(self, m):
         if not YONETICI.veriler: 
             Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
-        
         if m == "etkinlik":
             self.manager.get_screen('etkinlik').baslat()
             self.manager.current = 'etkinlik'
@@ -267,7 +277,6 @@ class InfoEkrani(Screen):
         s = len(YONETICI.veriler)
         self.lbl.text = f'Toplam Kelime: "{s}"'
 
-# --- YENİ ETKİNLİK EKRANI (CÜMLE KURMA) ---
 class EtkinlikEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -276,46 +285,35 @@ class EtkinlikEkrani(Screen):
         self.kullanici_siralama = []
         
         main_layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
-        
-        # 1. ÜST BİLGİ (İpucu)
         self.lbl_ipucu = Label(text="Cümleyi Oluşturun", font_size='20sp', size_hint=(1, 0.15))
         main_layout.add_widget(self.lbl_ipucu)
         
-        # 2. CEVAP ALANI (Kullanıcının kelimeleri taşıdığı yer)
-        self.cevap_kutusu = StackLayout(padding=10, spacing=10, size_hint=(1, 0.25))
-        # Arka plan rengi için canvas ekleyelim
+        # --- CEVAP ALANI (BOŞLUKLAR ARTIRILDI) ---
+        self.cevap_kutusu = StackLayout(padding=20, spacing=15, size_hint=(1, 0.30))
         with self.cevap_kutusu.canvas.before:
-            Color(0.2, 0.2, 0.2, 1) # Koyu zemin
+            Color(0.2, 0.2, 0.2, 1)
             self.rect = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
         self.cevap_kutusu.bind(pos=self.guncelle_rect, size=self.guncelle_rect)
         main_layout.add_widget(self.cevap_kutusu)
         
-        # 3. KELİME HAVUZU (Karışık kelimelerin durduğu yer)
-        self.kelime_havuzu = StackLayout(padding=10, spacing=10, size_hint=(1, 0.35))
+        # --- KELİME HAVUZU (BOŞLUKLAR ARTIRILDI) ---
+        self.kelime_havuzu = StackLayout(padding=20, spacing=15, size_hint=(1, 0.35))
         main_layout.add_widget(self.kelime_havuzu)
         
-        # 4. KONTROL BUTONLARI
         btns = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=112)
-        
         b_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1))
         b_kontrol.bind(on_press=self.kontrol_et)
-        
         b_goster = OzelButon(text="Doğruyu Gör", background_color=(1, 0.6, 0, 1))
         b_goster.bind(on_press=self.dogruyu_goster)
-        
-        btns.add_widget(b_kontrol)
-        btns.add_widget(b_goster)
+        btns.add_widget(b_kontrol); btns.add_widget(b_goster)
         main_layout.add_widget(btns)
         
-        # 5. ALT NAVİGASYON
         nav = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=80)
         b_menu = OzelButon(text="Menü", background_color=(0.5, 0.5, 0.5, 1))
         b_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         b_ileri = OzelButon(text="İleri", background_color=(0.2, 0.6, 0.8, 1))
         b_ileri.bind(on_press=lambda x: self.baslat())
-        
-        nav.add_widget(b_menu)
-        nav.add_widget(b_ileri)
+        nav.add_widget(b_menu); nav.add_widget(b_ileri)
         main_layout.add_widget(nav)
         
         self.add_widget(main_layout)
@@ -328,22 +326,15 @@ class EtkinlikEkrani(Screen):
         self.cevap_kutusu.clear_widgets()
         self.kelime_havuzu.clear_widgets()
         self.kullanici_siralama = []
-        
         if not YONETICI.veriler: return
         
-        # Rastgele cümle seç (Sadece İngilizce cümlesi dolu olanlar)
         self.aktif_veri = random.choice([v for v in YONETICI.veriler if v.get('cen')])
-        
-        # İpucu (Türkçesi)
         self.lbl_ipucu.text = f"[b]{self.aktif_veri['ctr']}[/b]"
         self.lbl_ipucu.markup = True
         
-        # Cümleyi kelimelere ayır ve temizle
         cumle = self.aktif_veri['cen']
-        # Noktalama işaretlerini ayır veya temizle (Basit tutmak için temizliyoruz)
         temiz_cumle = re.sub(r'[^\w\s]', '', cumle) 
         self.dogru_siralama = temiz_cumle.split()
-        
         karisik_kelimeler = self.dogru_siralama.copy()
         random.shuffle(karisik_kelimeler)
         
@@ -353,12 +344,10 @@ class EtkinlikEkrani(Screen):
             self.kelime_havuzu.add_widget(btn)
 
     def kelime_tasima(self, btn):
-        # Eğer havuzdaysa -> Cevaba taşı
         if btn.parent == self.kelime_havuzu:
             self.kelime_havuzu.remove_widget(btn)
             self.cevap_kutusu.add_widget(btn)
             self.kullanici_siralama.append(btn.text)
-        # Eğer cevaptaysa -> Havuza geri taşı
         else:
             self.cevap_kutusu.remove_widget(btn)
             self.kelime_havuzu.add_widget(btn)
@@ -367,11 +356,9 @@ class EtkinlikEkrani(Screen):
 
     def kontrol_et(self, instance):
         if self.kullanici_siralama == self.dogru_siralama:
-            # DOĞRU: Yeşil Tik Sesi ve Popup
             Popup(title='Tebrikler!', content=Label(text='✅ Doğru Cevap!', font_size='24sp'), size_hint=(0.6, 0.3)).open()
             SES.oku("Correct!")
         else:
-            # YANLIŞ
             Popup(title='Hata', content=Label(text='❌ Yanlış Sıralama\nTekrar Dene', font_size='20sp', halign='center'), size_hint=(0.6, 0.3)).open()
 
     def dogruyu_goster(self, instance):
@@ -450,7 +437,7 @@ class AppMain(App):
         sm.add_widget(InfoEkrani(name='info'))
         sm.add_widget(AyarlarEkrani(name='ayarlar'))
         sm.add_widget(Calisma(name='calisma'))
-        sm.add_widget(EtkinlikEkrani(name='etkinlik')) # Etkinlik eklendi
+        sm.add_widget(EtkinlikEkrani(name='etkinlik'))
         return sm
 
 if __name__ == '__main__': AppMain().run()
