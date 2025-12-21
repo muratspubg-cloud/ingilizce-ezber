@@ -5,10 +5,12 @@ import sys
 import requests
 import shutil
 import re
+import math
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.stacklayout import StackLayout
+from kivy.uix.scrollview import ScrollView
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.button import Button
 from kivy.uix.label import Label
@@ -17,6 +19,7 @@ from kivy.uix.togglebutton import ToggleButton
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
 from kivy.graphics import Color, RoundedRectangle
+from kivy.storage.jsonstore import JsonStore
 from plyer import tts
 
 # --- AYARLAR ---
@@ -25,10 +28,9 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bn
 # Arka plan rengi (Koyu Gri)
 Window.clearcolor = (0.15, 0.15, 0.15, 1)
 
-# Global Ayarlar
-AYARLAR = {
-    "hiz": 1.0
-}
+# Global Ayarlar ve Kayıt Sistemi
+AYARLAR = {"hiz": 1.0}
+STORE = JsonStore('user_data.json') # Verileri kaydetmek için
 
 # Yedek veriler
 YEDEK_VERILER = [
@@ -54,21 +56,18 @@ class OzelButon(Button):
         self.bind(pos=self.guncelle_canvas, size=self.guncelle_canvas, state=self.guncelle_canvas)
 
     def guncelle_canvas(self, *args):
-        # Metni kenarlardan uzak tut
         self.text_size = (self.width - 20, None)
         self.canvas.before.clear()
         with self.canvas.before:
             r, g, b, a = self.ana_renk
-            # Gölge Katmanı
-            Color(r * 0.6, g * 0.6, b * 0.6, 1)
-            offset = 8 if self.state == 'normal' else 0 # Gölgeyi biraz daha belirgin yaptık
+            Color(r * 0.6, g * 0.6, b * 0.6, 1) # Gölge
+            offset = 8 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
-            # Ana Katman
-            Color(r, g, b, 1)
+            Color(r, g, b, 1) # Ana Yüzey
             y_pos = self.y if self.state == 'normal' else self.y - 8
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
-# --- KELİME PARÇASI BUTONU (DAHA GENİŞ VE FERAH) ---
+# --- KELİME PARÇASI BUTONU ---
 class KelimeParcasi(Button):
     def __init__(self, metin, **kwargs):
         super().__init__(**kwargs)
@@ -76,17 +75,11 @@ class KelimeParcasi(Button):
         self.font_size = '20sp'
         self.bold = True
         self.size_hint = (None, None)
-        self.height = 80 # Yükseklik artırıldı
-        
-        # --- GENİŞLİK AYARI (FERAH) ---
-        # Kelime uzunluğuna göre daha fazla yer ayırıyoruz
+        self.height = 80
         self.width = max(130, len(metin) * 24 + 50)
-        
         self.background_normal = ''
-        self.background_down = ''
         self.background_color = (0.25, 0.35, 0.45, 1) 
         self.color = (1, 1, 1, 1)
-        
         self.bind(pos=self.ciz, size=self.ciz)
 
     def ciz(self, *args):
@@ -199,7 +192,6 @@ class AyarlarEkrani(Screen):
         layout.add_widget(grid)
         layout.add_widget(Label(size_hint=(1, 0.4))) 
         
-        # Dön butonu da büyütüldü
         btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=168)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
@@ -218,15 +210,15 @@ class AnaMenu(Screen):
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
         layout.add_widget(Label(text="İngilizce Ezber", font_size='40sp', bold=True, size_hint=(1, 0.2)))
         
-        # --- BUTON BOYUTLARI GÜNCELLENDİ ---
-        # 112 * 1.5 = 168 (Devasa Butonlar)
         HEDEF_YUKSEKLIK = 168
         
+        # Kelime Çalış -> Level Seçmeye Gider
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn1.bind(on_press=lambda x: self.gecis("kelime"))
+        btn1.bind(on_press=lambda x: self.level_sec("kelime"))
         
+        # Cümle Çalış -> Level Seçmeye Gider
         btn2 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn2.bind(on_press=lambda x: self.gecis("cumle"))
+        btn2.bind(on_press=lambda x: self.level_sec("cumle"))
         
         btn_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_etkinlik.bind(on_press=lambda x: self.gecis("etkinlik"))
@@ -247,9 +239,6 @@ class AnaMenu(Screen):
         layout.add_widget(btn1); layout.add_widget(btn2); layout.add_widget(btn_etkinlik); layout.add_widget(btn3)
         layout.add_widget(grid); layout.add_widget(btn5)
         layout.add_widget(Label(size_hint=(1, 0.05)))
-        
-        # Bu haliyle ekrana sığması için ScrollView gerekebilir ama 
-        # şimdilik sığacağını varsayıyoruz (modern telefonlar uzun ekranlıdır).
         self.add_widget(layout)
 
     def guncelle(self, i):
@@ -257,15 +246,92 @@ class AnaMenu(Screen):
         s,m = YONETICI.internetten_guncelle(); p.dismiss()
         Popup(title='Durum', content=Label(text=m), size_hint=(0.8, 0.4)).open()
 
+    def level_sec(self, mod_tipi):
+        if not YONETICI.veriler: 
+            Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
+        
+        # Level ekranını hazırla
+        ekran = self.manager.get_screen('level')
+        ekran.modu_ayarla(mod_tipi)
+        self.manager.current = 'level'
+
     def gecis(self, m):
         if not YONETICI.veriler: 
             Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
         if m == "etkinlik":
             self.manager.get_screen('etkinlik').baslat()
             self.manager.current = 'etkinlik'
-        else:
-            self.manager.get_screen('calisma').baslat(m)
-            self.manager.current = 'calisma'
+
+# --- YENİ LEVEL SEÇİM EKRANI ---
+class LevelEkrani(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.hedef_mod = "kelime"
+        self.govde = BoxLayout(orientation='vertical', padding=20, spacing=20)
+        
+        # Başlık
+        self.lbl_baslik = Label(text="Level Seçin", font_size='30sp', size_hint=(1, 0.15))
+        self.govde.add_widget(self.lbl_baslik)
+        
+        # ScrollView İçinde Butonlar
+        self.scroll = ScrollView(size_hint=(1, 0.7))
+        self.grid = GridLayout(cols=3, spacing=15, size_hint_y=None)
+        self.grid.bind(minimum_height=self.grid.setter('height'))
+        self.scroll.add_widget(self.grid)
+        self.govde.add_widget(self.scroll)
+        
+        # Son Çalışılan Level Bilgisi
+        self.lbl_son_level = Label(text="Son Çalışılan: Yok", font_size='18sp', color=(0.6, 0.8, 1, 1), size_hint=(1, 0.05))
+        self.govde.add_widget(self.lbl_son_level)
+        
+        # Geri Butonu
+        btn_geri = OzelButon(text="Geri", background_color=(1,0.6,0,1), size_hint=(1, 0.1))
+        btn_geri.bind(on_press=self.geri_don)
+        self.govde.add_widget(btn_geri)
+        
+        self.add_widget(self.govde)
+
+    def on_pre_enter(self):
+        # Ekran açılmadan önce butonları oluştur
+        self.grid.clear_widgets()
+        toplam_kelime = len(YONETICI.veriler)
+        kelime_basi = 25
+        toplam_level = math.ceil(toplam_kelime / kelime_basi)
+        
+        # Son çalışılan level'ı yükle
+        if STORE.exists('ilerleme'):
+            son = STORE.get('ilerleme')['son_level']
+            self.lbl_son_level.text = f"Son Çalışılan Level: {son}"
+        
+        for i in range(toplam_level):
+            lvl_num = i + 1
+            bas = i * kelime_basi
+            bit = bas + kelime_basi
+            metin = f"{lvl_num}"
+            
+            btn = OzelButon(text=metin, background_color=(0.2, 0.5, 0.7, 1), size_hint=(None, None), size=(100, 100))
+            # Butona tıklanınca o aralıktaki kelimeleri gönder
+            btn.bind(on_press=lambda x, b=bas, s=bit, l=lvl_num: self.baslat(b, s, l))
+            self.grid.add_widget(btn)
+
+    def modu_ayarla(self, mod):
+        self.hedef_mod = mod
+        self.lbl_baslik.text = "Kelime Levelleri" if mod == "kelime" else "Cümle Levelleri"
+
+    def baslat(self, baslangic, bitis, level_num):
+        # Level'ı kaydet
+        STORE.put('ilerleme', son_level=level_num)
+        
+        # Seçili aralığı al
+        secili_liste = YONETICI.veriler[baslangic:bitis]
+        
+        # Çalışma ekranına gönder
+        calisma_ekrani = self.manager.get_screen('calisma')
+        calisma_ekrani.baslat_ozel(self.hedef_mod, secili_liste)
+        self.manager.current = 'calisma'
+
+    def geri_don(self, instance):
+        self.manager.current = 'menu'
 
 class InfoEkrani(Screen):
     def __init__(self, **kwargs):
@@ -273,17 +339,8 @@ class InfoEkrani(Screen):
         layout = BoxLayout(orientation='vertical', padding=40, spacing=20)
         self.lbl = Label(text="...", font_size='22sp', halign='center', size_hint=(1, 0.6))
         layout.add_widget(self.lbl)
-        
-        # --- İSTEK: 20 PUNTO VE BOLD ---
-        imza = Label(
-            text="Hazırlayan: Murat SERT", 
-            font_size='20sp',  # 20 Punto
-            bold=True,         # Kalın (Bold)
-            color=(0.7, 0.7, 0.7, 1), 
-            size_hint=(1, 0.1)
-        )
+        imza = Label(text="Hazırlayan: Murat SERT", font_size='20sp', bold=True, color=(0.7, 0.7, 0.7, 1), size_hint=(1, 0.1))
         layout.add_widget(imza)
-        
         btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=168)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
@@ -303,7 +360,6 @@ class EtkinlikEkrani(Screen):
         self.lbl_ipucu = Label(text="Cümleyi Oluşturun", font_size='20sp', size_hint=(1, 0.15))
         main_layout.add_widget(self.lbl_ipucu)
         
-        # --- CEVAP ALANI (DAHA GENİŞ SPACING) ---
         self.cevap_kutusu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.30))
         with self.cevap_kutusu.canvas.before:
             Color(0.2, 0.2, 0.2, 1)
@@ -311,7 +367,6 @@ class EtkinlikEkrani(Screen):
         self.cevap_kutusu.bind(pos=self.guncelle_rect, size=self.guncelle_rect)
         main_layout.add_widget(self.cevap_kutusu)
         
-        # --- KELİME HAVUZU (DAHA GENİŞ SPACING) ---
         self.kelime_havuzu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.35))
         main_layout.add_widget(self.kelime_havuzu)
         
@@ -330,7 +385,6 @@ class EtkinlikEkrani(Screen):
         b_ileri.bind(on_press=lambda x: self.baslat())
         nav.add_widget(b_menu); nav.add_widget(b_ileri)
         main_layout.add_widget(nav)
-        
         self.add_widget(main_layout)
 
     def guncelle_rect(self, instance, value):
@@ -342,17 +396,14 @@ class EtkinlikEkrani(Screen):
         self.kelime_havuzu.clear_widgets()
         self.kullanici_siralama = []
         if not YONETICI.veriler: return
-        
         self.aktif_veri = random.choice([v for v in YONETICI.veriler if v.get('cen')])
         self.lbl_ipucu.text = f"[b]{self.aktif_veri['ctr']}[/b]"
         self.lbl_ipucu.markup = True
-        
         cumle = self.aktif_veri['cen']
         temiz_cumle = re.sub(r'[^\w\s]', '', cumle) 
         self.dogru_siralama = temiz_cumle.split()
         karisik_kelimeler = self.dogru_siralama.copy()
         random.shuffle(karisik_kelimeler)
-        
         for kelime in karisik_kelimeler:
             btn = KelimeParcasi(metin=kelime)
             btn.bind(on_press=self.kelime_tasima)
@@ -378,20 +429,31 @@ class EtkinlikEkrani(Screen):
 
     def dogruyu_goster(self, instance):
         if self.aktif_veri:
-            Popup(title='Doğru Cümle', content=Label(text=self.aktif_veri['cen'], font_size='20sp', halign='center'), size_hint=(0.8, 0.4)).open()
+            # --- DÜZELTME: Metin Kaydırma Eklendi ---
+            # text_size ile metni popup genişliğine sığdırıyoruz
+            lbl = Label(
+                text=self.aktif_veri['cen'], 
+                font_size='20sp', 
+                halign='center', 
+                valign='middle'
+            )
+            # Label boyutunu pencere boyutuna göre ayarla
+            lbl.bind(size=lambda *x: setattr(lbl, 'text_size', (lbl.width - 20, None)))
+            
+            Popup(title='Doğru Cümle', content=lbl, size_hint=(0.8, 0.4)).open()
             SES.oku(self.aktif_veri['cen'])
 
 class Calisma(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.gecmis, self.aktif, self.yon, self.cevrildi = [], None, "tr_to_en", False
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        # Varsayılan liste (tümü)
+        self.calisma_listesi = [] 
         
+        layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
         self.kart = OzelButon(text="Başla", background_color=get_color_from_hex('#455A64'))
         self.kart.font_size = '22sp'
         self.kart.bind(on_press=self.cevir)
-        
-        # --- İSTEK: Hoparlör İkonu ve Dinle Yazısı ---
         self.btn_ses = OzelButon(text="🔊  DİNLE", background_color=(0.4, 0.4, 0.4, 1), size_hint=(1, None), height=90)
         self.btn_ses.bind(on_press=self.seslendir)
         
@@ -407,8 +469,16 @@ class Calisma(Screen):
         layout.add_widget(self.kart); layout.add_widget(self.btn_ses); layout.add_widget(btns)
         self.add_widget(layout)
 
-    def baslat(self, m): self.mod=m; self.gecmis=[]; self.ileri(None)
-    
+    # --- ÖNEMLİ: Level'dan gelen listeyi al ---
+    def baslat_ozel(self, mod, liste):
+        self.mod = mod
+        self.calisma_listesi = liste
+        self.gecmis = []
+        if self.calisma_listesi:
+            self.ileri(None)
+        else:
+            self.kart.text = "Bu levelda veri yok!"
+
     def seslendir(self, i):
         if self.aktif: 
             ham_metin = self.aktif['en'] if self.mod=="kelime" else self.aktif['cen']
@@ -418,7 +488,6 @@ class Calisma(Screen):
     def guncelle(self):
         self.kart.markup = True; v = self.aktif
         if not v: return
-        
         if not self.cevrildi:
             self.kart.ana_renk = get_color_from_hex('#37474F')
             self.kart.guncelle_canvas()
@@ -430,7 +499,6 @@ class Calisma(Screen):
             self.kart.ana_renk = get_color_from_hex('#FBC02D')
             self.kart.guncelle_canvas()
             self.kart.color = (0,0,0,1)
-            
             if self.mod == "kelime":
                 self.kart.text = f"[b]{v['en']}[/b]\n[{v['okunus']}]\n---\n{v['tr']}"
             else:
@@ -438,10 +506,13 @@ class Calisma(Screen):
 
     def cevir(self, i): self.cevrildi = not self.cevrildi; self.guncelle()
     def ileri(self, i): 
-        if not YONETICI.veriler: return
+        # Sadece seçili listeden (Leveldan) kelime seç
+        if not self.calisma_listesi: return
         if getattr(self,'aktif',None): self.gecmis.append({"v":self.aktif,"y":self.yon})
         try:
-            self.aktif=random.choice(YONETICI.veriler); self.yon=random.choice(["tr_to_en","en_to_tr"]); self.cevrildi=False; self.guncelle()
+            self.aktif=random.choice(self.calisma_listesi)
+            self.yon=random.choice(["tr_to_en","en_to_tr"])
+            self.cevrildi=False; self.guncelle()
         except: pass
     def geri(self, i): 
         if self.gecmis: s=self.gecmis.pop(); self.aktif=s["v"]; self.yon=s["y"]; self.cevrildi=False; self.guncelle()
@@ -450,6 +521,7 @@ class AppMain(App):
     def build(self):
         sm = ScreenManager()
         sm.add_widget(AnaMenu(name='menu'))
+        sm.add_widget(LevelEkrani(name='level')) # Level ekranı eklendi
         sm.add_widget(InfoEkrani(name='info'))
         sm.add_widget(AyarlarEkrani(name='ayarlar'))
         sm.add_widget(Calisma(name='calisma'))
