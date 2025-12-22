@@ -17,7 +17,7 @@ from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner, SpinnerOption
-from kivy.uix.dropdown import DropDown # EKLENDİ: Liste kontrolü için
+from kivy.uix.dropdown import DropDown
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
 from kivy.graphics import Color, RoundedRectangle
@@ -64,25 +64,21 @@ class OzelButon(Button):
             y_pos = self.y if self.state == 'normal' else self.y - 8
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
-# --- ÖZEL SPINNER SEÇENEĞİ (BÜYÜK PUNTO) ---
+# --- SPINNER AYARLARI ---
 class BuyukSpinnerOption(SpinnerOption):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.font_size = '22sp'
-        self.height = 100 # Her satır 100 birim yükseklikte
+        self.height = 100
         self.background_normal = ''
         self.background_color = (0.2, 0.3, 0.4, 1)
         self.color = (1, 1, 1, 1)
 
-# --- KAYDIRILABİLİR DROPDOWN (SINIRLAYICI) ---
 class KaydirilabilirDropDown(DropDown):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # 8 satır x 100 birim = 800 birim maksimum yükseklik
-        # Bundan sonrası scroll (kaydırma) olur.
         self.max_height = 800 
 
-# --- KELİME PARÇASI BUTONU ---
 class KelimeParcasi(Button):
     def __init__(self, metin, **kwargs):
         super().__init__(**kwargs)
@@ -273,7 +269,6 @@ class AnaMenu(Screen):
             self.manager.get_screen('etkinlik').baslat()
             self.manager.current = 'etkinlik'
 
-# --- AÇILAN LİSTE (SPINNER) ŞEKLİNDE LEVEL EKRANI (DÜZELTİLDİ) ---
 class LevelEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -283,8 +278,6 @@ class LevelEkrani(Screen):
         self.lbl_baslik = Label(text="Level Seçin", font_size='32sp', size_hint=(1, 0.2))
         self.govde.add_widget(self.lbl_baslik)
         
-        # --- SPINNER (AÇILIR LİSTE) ---
-        # dropdown_cls=KaydirilabilirDropDown ile listeyi 8 satırla sınırladık
         self.spinner = Spinner(
             text='Level Seçiniz',
             values=(),
@@ -293,7 +286,7 @@ class LevelEkrani(Screen):
             background_color=(0.2, 0.6, 0.8, 1),
             font_size='24sp',
             option_cls=BuyukSpinnerOption,
-            dropdown_cls=KaydirilabilirDropDown # Kaydırma özelliği eklendi
+            dropdown_cls=KaydirilabilirDropDown
         )
         self.spinner.bind(text=self.level_secildi)
         self.govde.add_widget(self.spinner)
@@ -310,11 +303,15 @@ class LevelEkrani(Screen):
         self.add_widget(self.govde)
 
     def on_pre_enter(self):
+        # Spinner listesini sadece bir kere oluştur veya güncelle
         toplam_kelime = len(YONETICI.veriler)
         kelime_basi = 25
         toplam_level = math.ceil(toplam_kelime / kelime_basi)
         level_listesi = [f"Level {i+1}" for i in range(toplam_level)]
         self.spinner.values = level_listesi
+        
+        # Resetleme işlemini dikkatli yap (Kapanma sorunu için)
+        # Sadece text'i değiştiriyoruz, seçim yapılmış saymıyoruz
         self.spinner.text = 'Level Seçiniz'
         
         if STORE.exists('ilerleme'):
@@ -326,16 +323,30 @@ class LevelEkrani(Screen):
         self.lbl_baslik.text = "Kelime Levelleri" if mod == "kelime" else "Cümle Levelleri"
 
     def level_secildi(self, spinner, text):
+        # KAPANMA SORUNUNU ÇÖZEN KISIM:
+        # Eğer text 'Level Seçiniz' ise (yani resetlendiyse) işlem yapma!
         if not text.startswith("Level"): return
-        level_num = int(text.split()[1])
-        kelime_basi = 25
-        baslangic = (level_num - 1) * kelime_basi
-        bitis = baslangic + kelime_basi
-        STORE.put('ilerleme', son_level=text)
-        secili_liste = YONETICI.veriler[baslangic:bitis]
-        calisma_ekrani = self.manager.get_screen('calisma')
-        calisma_ekrani.baslat_ozel(self.hedef_mod, secili_liste)
-        self.manager.current = 'calisma'
+        
+        try:
+            level_num = int(text.split()[1])
+            kelime_basi = 25
+            baslangic = (level_num - 1) * kelime_basi
+            bitis = baslangic + kelime_basi
+            
+            STORE.put('ilerleme', son_level=text)
+            
+            secili_liste = YONETICI.veriler[baslangic:bitis]
+            
+            # Calisma ekranına veriyi yükle ama geçişi güvenli yap
+            calisma_ekrani = self.manager.get_screen('calisma')
+            if not secili_liste:
+                Popup(title='Hata', content=Label(text='Bu Level Boş!'), size_hint=(0.6, 0.3)).open()
+                return
+                
+            calisma_ekrani.baslat_ozel(self.hedef_mod, secili_liste)
+            self.manager.current = 'calisma'
+        except Exception as e:
+            print(f"Hata: {e}")
 
     def geri_don(self, instance): self.manager.current = 'menu'
 
@@ -508,6 +519,7 @@ class Calisma(Screen):
 
     def cevir(self, i): self.cevrildi = not self.cevrildi; self.guncelle()
     def ileri(self, i): 
+        # Sadece seçili listeden (Leveldan) kelime seç
         if not self.calisma_listesi: return
         if getattr(self,'aktif',None): self.gecmis.append({"v":self.aktif,"y":self.yon})
         try:
