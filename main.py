@@ -17,6 +17,7 @@ from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner, SpinnerOption
+from kivy.uix.dropdown import DropDown # EKLENDİ: Liste kontrolü için
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
 from kivy.graphics import Color, RoundedRectangle
@@ -63,15 +64,23 @@ class OzelButon(Button):
             y_pos = self.y if self.state == 'normal' else self.y - 8
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
-# --- ÖZEL SPINNER SEÇENEĞİ (BÜYÜK PUNTO İÇİN) ---
+# --- ÖZEL SPINNER SEÇENEĞİ (BÜYÜK PUNTO) ---
 class BuyukSpinnerOption(SpinnerOption):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.font_size = '22sp' # Büyük yazı
-        self.height = 100       # Yüksek satır (Kolay seçim)
+        self.font_size = '22sp'
+        self.height = 100 # Her satır 100 birim yükseklikte
         self.background_normal = ''
-        self.background_color = (0.2, 0.3, 0.4, 1) # Koyu Mavi
+        self.background_color = (0.2, 0.3, 0.4, 1)
         self.color = (1, 1, 1, 1)
+
+# --- KAYDIRILABİLİR DROPDOWN (SINIRLAYICI) ---
+class KaydirilabilirDropDown(DropDown):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 8 satır x 100 birim = 800 birim maksimum yükseklik
+        # Bundan sonrası scroll (kaydırma) olur.
+        self.max_height = 800 
 
 # --- KELİME PARÇASI BUTONU ---
 class KelimeParcasi(Button):
@@ -264,7 +273,7 @@ class AnaMenu(Screen):
             self.manager.get_screen('etkinlik').baslat()
             self.manager.current = 'etkinlik'
 
-# --- YENİ AÇILAN LİSTE (DROPDOWN) ŞEKLİNDE LEVEL EKRANI ---
+# --- AÇILAN LİSTE (SPINNER) ŞEKLİNDE LEVEL EKRANI (DÜZELTİLDİ) ---
 class LevelEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -274,7 +283,8 @@ class LevelEkrani(Screen):
         self.lbl_baslik = Label(text="Level Seçin", font_size='32sp', size_hint=(1, 0.2))
         self.govde.add_widget(self.lbl_baslik)
         
-        # --- AÇILAN LİSTE (SPINNER) ---
+        # --- SPINNER (AÇILIR LİSTE) ---
+        # dropdown_cls=KaydirilabilirDropDown ile listeyi 8 satırla sınırladık
         self.spinner = Spinner(
             text='Level Seçiniz',
             values=(),
@@ -282,15 +292,14 @@ class LevelEkrani(Screen):
             pos_hint={'center_x': .5, 'center_y': .5},
             background_color=(0.2, 0.6, 0.8, 1),
             font_size='24sp',
-            option_cls=BuyukSpinnerOption # Büyük seçenekler için
+            option_cls=BuyukSpinnerOption,
+            dropdown_cls=KaydirilabilirDropDown # Kaydırma özelliği eklendi
         )
         self.spinner.bind(text=self.level_secildi)
         self.govde.add_widget(self.spinner)
         
-        # Boşluk
         self.govde.add_widget(Label(size_hint=(1, 0.3)))
         
-        # Son Çalışılan Bilgisi
         self.lbl_son_level = Label(text="Son Çalışılan: Yok", font_size='20sp', color=(0.6, 0.8, 1, 1), size_hint=(1, 0.1))
         self.govde.add_widget(self.lbl_son_level)
         
@@ -301,12 +310,9 @@ class LevelEkrani(Screen):
         self.add_widget(self.govde)
 
     def on_pre_enter(self):
-        # Levelleri oluştur
         toplam_kelime = len(YONETICI.veriler)
         kelime_basi = 25
         toplam_level = math.ceil(toplam_kelime / kelime_basi)
-        
-        # Liste değerlerini hazırla (Level 1, Level 2...)
         level_listesi = [f"Level {i+1}" for i in range(toplam_level)]
         self.spinner.values = level_listesi
         self.spinner.text = 'Level Seçiniz'
@@ -321,28 +327,17 @@ class LevelEkrani(Screen):
 
     def level_secildi(self, spinner, text):
         if not text.startswith("Level"): return
-        
-        # Text'ten numarayı al (Level 5 -> 5)
         level_num = int(text.split()[1])
-        
-        # Hesaplamalar
         kelime_basi = 25
         baslangic = (level_num - 1) * kelime_basi
         bitis = baslangic + kelime_basi
-        
-        # Kaydet
         STORE.put('ilerleme', son_level=text)
-        
-        # Veriyi seç
         secili_liste = YONETICI.veriler[baslangic:bitis]
-        
-        # Başlat
         calisma_ekrani = self.manager.get_screen('calisma')
         calisma_ekrani.baslat_ozel(self.hedef_mod, secili_liste)
         self.manager.current = 'calisma'
 
-    def geri_don(self, instance):
-        self.manager.current = 'menu'
+    def geri_don(self, instance): self.manager.current = 'menu'
 
 class InfoEkrani(Screen):
     def __init__(self, **kwargs):
@@ -384,7 +379,7 @@ class EtkinlikEkrani(Screen):
         self.kelime_havuzu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.35))
         main_layout.add_widget(self.kelime_havuzu)
         
-        # --- DÜZELTME: BUTONLAR EŞİTLENDİ (100 YÜKSEKLİK) ---
+        # --- BUTONLAR EŞİTLENDİ ---
         HEDEF_BTN = 100
         
         btns = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=HEDEF_BTN)
