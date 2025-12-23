@@ -79,7 +79,7 @@ class KaydirilabilirDropDown(DropDown):
         super().__init__(**kwargs)
         self.max_height = 800 
 
-# --- KELİME PARÇASI (Cümle Etkinliği İçin) ---
+# --- KELİME PARÇASI (Cümle Etkinliği) ---
 class KelimeParcasi(Button):
     def __init__(self, metin, **kwargs):
         super().__init__(**kwargs)
@@ -100,7 +100,7 @@ class KelimeParcasi(Button):
             Color(*self.background_color)
             RoundedRectangle(pos=self.pos, size=self.size, radius=[12])
 
-# --- HARF PARÇASI (Kelime Etkinliği İçin - KARE ŞEKLİNDE) ---
+# --- HARF PARÇASI (Kelime Etkinliği - Kare) ---
 class HarfParcasi(Button):
     def __init__(self, harf, **kwargs):
         super().__init__(**kwargs)
@@ -108,9 +108,9 @@ class HarfParcasi(Button):
         self.font_size = '28sp'
         self.bold = True
         self.size_hint = (None, None)
-        self.size = (70, 70) # Kare butonlar
+        self.size = (70, 70)
         self.background_normal = ''
-        self.background_color = (0.8, 0.5, 0.2, 1) # Turuncu tonu
+        self.background_color = (0.8, 0.5, 0.2, 1)
         self.color = (1, 1, 1, 1)
         self.bind(pos=self.ciz, size=self.ciz)
 
@@ -244,19 +244,15 @@ class AnaMenu(Screen):
         
         HEDEF_YUKSEKLIK = 168
         
-        # Kelime Çalış -> Level
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.level_sec("kelime"))
         
-        # Cümle Çalış -> Level
         btn2 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn2.bind(on_press=lambda x: self.level_sec("cumle"))
         
-        # --- YENİ BUTON: KELİME OLUŞTURMA (Etkinlik) ---
         btn_kelime_etkinlik = OzelButon(text="Kelime Kurma (Etkinlik)", background_color=(0.9, 0.5, 0.1, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_kelime_etkinlik.bind(on_press=lambda x: self.level_sec("etkinlik_kelime"))
 
-        # Cümle Oluşturma (Etkinlik) -> Level
         btn_cumle_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_cumle_etkinlik.bind(on_press=lambda x: self.level_sec("etkinlik_cumle"))
         
@@ -273,16 +269,9 @@ class AnaMenu(Screen):
         btn5 = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn5.bind(on_press=lambda x: sys.exit())
         
-        # Sıralama: KelimeÇ, CümleÇ, KelimeKurma, CümleKurma, Güncelle...
-        layout.add_widget(btn1)
-        layout.add_widget(btn2)
-        layout.add_widget(btn_kelime_etkinlik) # Yeni Eklendi
-        layout.add_widget(btn_cumle_etkinlik)
-        layout.add_widget(btn3)
-        layout.add_widget(grid)
-        layout.add_widget(btn5)
-        
-        # ScrollView içine alınabilir ama şimdilik sığdırıyoruz
+        layout.add_widget(btn1); layout.add_widget(btn2); layout.add_widget(btn_kelime_etkinlik)
+        layout.add_widget(btn_cumle_etkinlik); layout.add_widget(btn3)
+        layout.add_widget(grid); layout.add_widget(btn5)
         layout.add_widget(Label(size_hint=(1, 0.05)))
         self.add_widget(layout)
 
@@ -303,7 +292,6 @@ class LevelEkrani(Screen):
         super().__init__(**kwargs)
         self.hedef_mod = "kelime"
         self.govde = BoxLayout(orientation='vertical', padding=30, spacing=30)
-        
         self.lbl_baslik = Label(text="Level Seçin", font_size='32sp', size_hint=(1, 0.2))
         self.govde.add_widget(self.lbl_baslik)
         
@@ -319,16 +307,12 @@ class LevelEkrani(Screen):
         )
         self.spinner.bind(text=self.level_secildi)
         self.govde.add_widget(self.spinner)
-        
         self.govde.add_widget(Label(size_hint=(1, 0.3)))
-        
         self.lbl_son_level = Label(text="Son Çalışılan: Yok", font_size='20sp', color=(0.6, 0.8, 1, 1), size_hint=(1, 0.1))
         self.govde.add_widget(self.lbl_son_level)
-        
         btn_geri = OzelButon(text="Geri", background_color=(1,0.6,0,1), size_hint=(1, 0.15))
         btn_geri.bind(on_press=self.geri_don)
         self.govde.add_widget(btn_geri)
-        
         self.add_widget(self.govde)
 
     def on_pre_enter(self):
@@ -357,13 +341,10 @@ class LevelEkrani(Screen):
             baslangic = (level_num - 1) * kelime_basi
             bitis = baslangic + kelime_basi
             STORE.put('ilerleme', son_level=text)
-            
             secili_liste = YONETICI.veriler[baslangic:bitis]
             if not secili_liste:
-                Popup(title='Hata', content=Label(text='Bu Level Boş!'), size_hint=(0.6, 0.3)).open()
-                return
+                Popup(title='Hata', content=Label(text='Bu Level Boş!'), size_hint=(0.6, 0.3)).open(); return
 
-            # YÖNLENDİRME MANTIĞI
             if self.hedef_mod in ["kelime", "cumle"]:
                 ekran = self.manager.get_screen('calisma')
                 ekran.baslat_ozel(self.hedef_mod, secili_liste)
@@ -376,7 +357,6 @@ class LevelEkrani(Screen):
                 ekran = self.manager.get_screen('etkinlik_kelime')
                 ekran.baslat(secili_liste)
                 self.manager.current = 'etkinlik_kelime'
-
         except Exception as e: print(f"Hata: {e}")
 
     def geri_don(self, instance): self.manager.current = 'menu'
@@ -397,7 +377,7 @@ class InfoEkrani(Screen):
         s = len(YONETICI.veriler)
         self.lbl.text = f'Toplam Kelime: "{s}"'
 
-# --- YENİ KELİME KURMA ETKİNLİĞİ ---
+# --- KELİME KURMA ETKİNLİĞİ ---
 class KelimeEtkinlikEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -410,7 +390,6 @@ class KelimeEtkinlikEkrani(Screen):
         self.lbl_ipucu = Label(text="Kelimeyi Yazın", font_size='24sp', size_hint=(1, 0.15))
         main_layout.add_widget(self.lbl_ipucu)
         
-        # Cevap Alanı
         self.cevap_kutusu = StackLayout(padding=20, spacing=15, size_hint=(1, 0.20))
         with self.cevap_kutusu.canvas.before:
             Color(0.2, 0.2, 0.2, 1)
@@ -418,11 +397,9 @@ class KelimeEtkinlikEkrani(Screen):
         self.cevap_kutusu.bind(pos=self.guncelle_rect, size=self.guncelle_rect)
         main_layout.add_widget(self.cevap_kutusu)
         
-        # Harf Havuzu
         self.harf_havuzu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.45))
         main_layout.add_widget(self.harf_havuzu)
         
-        # Butonlar
         HEDEF_BTN = 100
         btns = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=HEDEF_BTN)
         b_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1), size_hint=(1, None), height=HEDEF_BTN)
@@ -457,14 +434,16 @@ class KelimeEtkinlikEkrani(Screen):
         if not self.calisma_listesi: return
         
         self.aktif_veri = random.choice(self.calisma_listesi)
-        # Türkçe anlamını ipucu olarak göster
         self.lbl_ipucu.text = f"[b]{self.aktif_veri['tr']}[/b]"
         self.lbl_ipucu.markup = True
         
-        # İngilizce kelimeyi al ve harflere böl
         kelime = self.aktif_veri['en']
-        # Sadece harfleri al, parantez vs temizle (Regex)
-        temiz_kelime = re.sub(r'[^a-zA-Z]', '', kelime).lower()
+        
+        # --- PARANTEZ İÇİNİ SİL VE TEMİZLE ---
+        kelime_temiz = re.sub(r"\(.*?\)", "", kelime) # (v.) vb. sil
+        
+        # Sadece harfleri al
+        temiz_kelime = re.sub(r'[^a-zA-Z]', '', kelime_temiz).lower()
         self.dogru_siralama = list(temiz_kelime)
         
         karisik_harfler = self.dogru_siralama.copy()
@@ -483,7 +462,6 @@ class KelimeEtkinlikEkrani(Screen):
         else:
             self.cevap_kutusu.remove_widget(btn)
             self.harf_havuzu.add_widget(btn)
-            # Listeden sil (ilk bulduğunu)
             if btn.text.lower() in self.kullanici_siralama:
                 self.kullanici_siralama.remove(btn.text.lower())
 
@@ -497,12 +475,10 @@ class KelimeEtkinlikEkrani(Screen):
     def dogruyu_goster(self, instance):
         if self.aktif_veri:
             kelime = self.aktif_veri['en']
-            # Parantez içlerini temizle okumak için
             temiz = re.sub(r"\(.*?\)", "", kelime).strip()
             Popup(title='Doğru Kelime', content=Label(text=kelime, font_size='24sp'), size_hint=(0.8, 0.4)).open()
             SES.oku(temiz)
 
-# --- CÜMLE KURMA ETKİNLİĞİ ---
 class EtkinlikEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -542,6 +518,7 @@ class EtkinlikEkrani(Screen):
         b_ileri.bind(on_press=lambda x: self.yeni_soru())
         nav.add_widget(b_menu); nav.add_widget(b_ileri)
         main_layout.add_widget(nav)
+        
         self.add_widget(main_layout)
 
     def guncelle_rect(self, instance, value):
@@ -557,23 +534,14 @@ class EtkinlikEkrani(Screen):
         self.kelime_havuzu.clear_widgets()
         self.kullanici_siralama = []
         if not self.calisma_listesi: return
-        
-        # Cümlesi olanları filtrele
-        adaylar = [v for v in self.calisma_listesi if v.get('cen')]
-        if not adaylar: 
-            self.lbl_ipucu.text = "Bu levelda cümle yok!"
-            return
-
-        self.aktif_veri = random.choice(adaylar)
+        self.aktif_veri = random.choice([v for v in self.calisma_listesi if v.get('cen')])
         self.lbl_ipucu.text = f"[b]{self.aktif_veri['ctr']}[/b]"
         self.lbl_ipucu.markup = True
-        
         cumle = self.aktif_veri['cen']
         temiz_cumle = re.sub(r'[^\w\s]', '', cumle) 
         self.dogru_siralama = temiz_cumle.split()
         karisik_kelimeler = self.dogru_siralama.copy()
         random.shuffle(karisik_kelimeler)
-        
         for kelime in karisik_kelimeler:
             btn = KelimeParcasi(metin=kelime)
             btn.bind(on_press=self.kelime_tasima)
@@ -678,8 +646,8 @@ class AppMain(App):
         sm.add_widget(InfoEkrani(name='info'))
         sm.add_widget(AyarlarEkrani(name='ayarlar'))
         sm.add_widget(Calisma(name='calisma'))
-        sm.add_widget(EtkinlikEkrani(name='etkinlik_cumle'))  # İsim düzeltildi
-        sm.add_widget(KelimeEtkinlikEkrani(name='etkinlik_kelime')) # Yeni
+        sm.add_widget(EtkinlikEkrani(name='etkinlik_cumle'))
+        sm.add_widget(KelimeEtkinlikEkrani(name='etkinlik_kelime'))
         return sm
 
 if __name__ == '__main__': AppMain().run()
