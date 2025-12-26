@@ -25,7 +25,11 @@ from kivy.storage.jsonstore import JsonStore
 from plyer import tts
 
 # --- AYARLAR ---
+# 1. Ana Kelime Listesi
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv"
+
+# 2. Dil Kursu Listesi
+CSV_URL_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTT6HjmaATaFYx7ahx4vG5lOfOzVnUEUwjaGZqSVnCPU36oggWBLqW5zoFP4C9t8IVMRg1jYez9rwB7/pub?output=csv"
 
 Window.clearcolor = (0.15, 0.15, 0.15, 1)
 AYARLAR = {"hiz": 1.0}
@@ -34,6 +38,12 @@ STORE = JsonStore('user_data.json')
 YEDEK_VERILER = [
     {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
     {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"}
+]
+
+# Dil kursu için yedek veri
+DIL_KURSU_YEDEK = [
+    {"tr": "Öğrenci", "en": "Student", "ipa": "", "okunus": "sityudınt", "cen": "I am a student", "ctr": "Ben bir öğrenciyim"},
+    {"tr": "Öğretmen", "en": "Teacher", "ipa": "", "okunus": "tiçır", "cen": "She is a teacher", "ctr": "O bir öğretmen"}
 ]
 
 # --- 3D GÖRÜNÜMLÜ ÖZEL BUTON ---
@@ -79,7 +89,7 @@ class KaydirilabilirDropDown(DropDown):
         super().__init__(**kwargs)
         self.max_height = 800 
 
-# --- KELİME PARÇASI (Cümle Etkinliği) ---
+# --- KELİME PARÇASI ---
 class KelimeParcasi(Button):
     def __init__(self, metin, **kwargs):
         super().__init__(**kwargs)
@@ -100,7 +110,7 @@ class KelimeParcasi(Button):
             Color(*self.background_color)
             RoundedRectangle(pos=self.pos, size=self.size, radius=[12])
 
-# --- HARF PARÇASI (Kelime Etkinliği - Kare) ---
+# --- HARF PARÇASI ---
 class HarfParcasi(Button):
     def __init__(self, harf, **kwargs):
         super().__init__(**kwargs)
@@ -147,31 +157,60 @@ SES = SesYoneticisi()
 
 class VeriYoneticisi:
     def __init__(self):
-        self.dosya_yolu = self.dosya_yolu_bul()
+        self.ana_dosya = 'kelimeler.csv'
+        self.dil_dosya = 'dilkursu.csv'
+        self.dosya_yolu_1 = self.yol_bul(self.ana_dosya)
+        self.dosya_yolu_2 = self.yol_bul(self.dil_dosya)
+        
         self.veriler = []
-        self.yukle()
+        self.dil_kursu_veriler = []
+        
+        # İlk yükleme
+        self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER)
+        self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK)
 
-    def dosya_yolu_bul(self):
+    def yol_bul(self, dosya_adi):
         if platform == 'android':
             from android.storage import app_storage_path
             klasor = app_storage_path()
         else:
             klasor = os.getcwd()
-        yol = os.path.join(klasor, 'kelimeler.csv')
-        if not os.path.exists(yol) and os.path.exists('kelimeler.csv'):
-            try: shutil.copy('kelimeler.csv', yol)
+        
+        yol = os.path.join(klasor, dosya_adi)
+        if not os.path.exists(yol) and os.path.exists(dosya_adi):
+            try: shutil.copy(dosya_adi, yol)
             except: pass
+        
+        if not os.path.exists(yol):
+            self.ornek_dosya_olustur(yol, dosya_adi)
+            
         return yol
+
+    def ornek_dosya_olustur(self, yol, ad):
+        try:
+            veri = DIL_KURSU_YEDEK if ad == 'dilkursu.csv' else YEDEK_VERILER
+            with open(yol, 'w', encoding='utf-8-sig') as f:
+                f.write("Sıra;TR;EN;IPA;Okunuş;CümleEN;CümleTR\n")
+                for v in veri:
+                    f.write(f"1;{v['tr']};{v['en']};;{v['okunus']};{v['cen']};{v['ctr']}\n")
+        except: pass
 
     def internetten_guncelle(self):
         try:
-            if "http" not in CSV_URL: return False, "Link Hatalı!"
-            response = requests.get(CSV_URL, timeout=15)
-            response.raise_for_status()
-            with open(self.dosya_yolu, 'wb') as f:
-                f.write(response.content)
-            self.yukle()
-            return True, "Başarıyla Güncellendi!"
+            if "http" in CSV_URL:
+                r1 = requests.get(CSV_URL, timeout=15)
+                r1.raise_for_status()
+                with open(self.dosya_yolu_1, 'wb') as f: f.write(r1.content)
+            
+            if "http" in CSV_URL_2:
+                r2 = requests.get(CSV_URL_2, timeout=15)
+                r2.raise_for_status()
+                with open(self.dosya_yolu_2, 'wb') as f: f.write(r2.content)
+            
+            self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER)
+            self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK)
+            
+            return True, "Tüm Listeler Güncellendi!"
         except Exception as e:
             return False, f"Hata: {str(e)}"
 
@@ -179,11 +218,11 @@ class VeriYoneticisi:
         if not metin: return ""
         return " ".join(str(metin).replace("\\n", " ").replace("\n", " ").replace("\r", "").split())
 
-    def yukle(self):
-        self.veriler = []
-        if os.path.exists(self.dosya_yolu):
+    def yukle(self, yol, yedek_veri):
+        liste = []
+        if os.path.exists(yol):
             try:
-                with open(self.dosya_yolu, 'r', encoding='utf-8-sig') as f:
+                with open(yol, 'r', encoding='utf-8-sig') as f:
                     content = f.read()
                     if content:
                         delimiter = ';' if ';' in content.splitlines()[0] else ','
@@ -196,12 +235,13 @@ class VeriYoneticisi:
                             if not row or len(row) < 3: continue
                             if not row[1].strip() or not row[2].strip(): continue
                             def safe(idx): return self.temizle(row[idx]) if idx < len(row) else ""
-                            self.veriler.append({
+                            liste.append({
                                 "tr": safe(1), "en": safe(2), "ipa": safe(3), 
                                 "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
                             })
             except: pass
-        if not self.veriler: self.veriler = YEDEK_VERILER.copy()
+        
+        return liste if liste else yedek_veri.copy()
 
 YONETICI = VeriYoneticisi()
 
@@ -239,10 +279,14 @@ class AyarlarEkrani(Screen):
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        layout.add_widget(Label(text="İngilizce Ezber", font_size='40sp', bold=True, size_hint=(1, 0.2)))
+        self.layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
+        self.layout.add_widget(Label(text="İngilizce Ezber", font_size='40sp', bold=True, size_hint=(1, 0.15)))
         
         HEDEF_YUKSEKLIK = 168
+        
+        scroll = ScrollView(size_hint=(1, 0.85))
+        grid_menu = GridLayout(cols=1, spacing=15, size_hint_y=None)
+        grid_menu.bind(minimum_height=grid_menu.setter('height'))
         
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.level_sec("kelime"))
@@ -256,27 +300,37 @@ class AnaMenu(Screen):
         btn_cumle_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_cumle_etkinlik.bind(on_press=lambda x: self.level_sec("etkinlik_cumle"))
         
+        btn_dil_kursu = OzelButon(text="Dil Kursu Kelimeleri", background_color=(0.9, 0.3, 0.3, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
+        btn_dil_kursu.bind(on_press=self.dil_kursu_baslat)
+        
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
         
-        grid = GridLayout(cols=2, spacing=15, size_hint=(1, None), height=HEDEF_YUKSEKLIK)
+        alt_grid = GridLayout(cols=2, spacing=15, size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         b_ayar = OzelButon(text="Ayarlar", background_color=(0.5,0.5,0.5,1))
         b_ayar.bind(on_press=lambda x: setattr(self.manager, 'current', 'ayarlar'))
         b_info = OzelButon(text="Info", background_color=(0,0.8,0.8,1))
         b_info.bind(on_press=lambda x: setattr(self.manager, 'current', 'info'))
-        grid.add_widget(b_ayar); grid.add_widget(b_info)
+        alt_grid.add_widget(b_ayar); alt_grid.add_widget(b_info)
         
         btn5 = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn5.bind(on_press=lambda x: sys.exit())
         
-        layout.add_widget(btn1); layout.add_widget(btn2); layout.add_widget(btn_kelime_etkinlik)
-        layout.add_widget(btn_cumle_etkinlik); layout.add_widget(btn3)
-        layout.add_widget(grid); layout.add_widget(btn5)
-        layout.add_widget(Label(size_hint=(1, 0.05)))
-        self.add_widget(layout)
+        grid_menu.add_widget(btn1)
+        grid_menu.add_widget(btn2)
+        grid_menu.add_widget(btn_kelime_etkinlik)
+        grid_menu.add_widget(btn_cumle_etkinlik)
+        grid_menu.add_widget(btn_dil_kursu)
+        grid_menu.add_widget(btn3)
+        grid_menu.add_widget(alt_grid)
+        grid_menu.add_widget(btn5)
+        
+        scroll.add_widget(grid_menu)
+        self.layout.add_widget(scroll)
+        self.add_widget(self.layout)
 
     def guncelle(self, i):
-        p=Popup(title='İşlem', content=Label(text='İndiriliyor...'), size_hint=(0.7, 0.3)); p.open()
+        p=Popup(title='İşlem', content=Label(text='Tüm Listeler İndiriliyor...'), size_hint=(0.7, 0.3)); p.open()
         s,m = YONETICI.internetten_guncelle(); p.dismiss()
         Popup(title='Durum', content=Label(text=m), size_hint=(0.8, 0.4)).open()
 
@@ -286,6 +340,21 @@ class AnaMenu(Screen):
         ekran = self.manager.get_screen('level')
         ekran.modu_ayarla(mod_tipi)
         self.manager.current = 'level'
+
+    def dil_kursu_baslat(self, instance):
+        if not YONETICI.dil_kursu_veriler:
+            Popup(title='Uyarı', content=Label(text='Dil Kursu Listesi Boş!'), size_hint=(0.8, 0.4)).open()
+            return
+        ekran = self.manager.get_screen('calisma')
+        ekran.baslat_ozel("kelime", YONETICI.dil_kursu_veriler) 
+        self.manager.current = 'calisma'
+
+    def gecis(self, m):
+        if not YONETICI.veriler: 
+            Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
+        if m == "etkinlik":
+            self.manager.get_screen('etkinlik').baslat()
+            self.manager.current = 'etkinlik'
 
 class LevelEkrani(Screen):
     def __init__(self, **kwargs):
@@ -375,9 +444,9 @@ class InfoEkrani(Screen):
         self.add_widget(layout)
     def on_pre_enter(self):
         s = len(YONETICI.veriler)
-        self.lbl.text = f'Toplam Kelime: "{s}"'
+        s2 = len(YONETICI.dil_kursu_veriler)
+        self.lbl.text = f'Ana Liste: "{s}"\nDil Kursu: "{s2}"'
 
-# --- KELİME KURMA ETKİNLİĞİ ---
 class KelimeEtkinlikEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -432,17 +501,12 @@ class KelimeEtkinlikEkrani(Screen):
         self.harf_havuzu.clear_widgets()
         self.kullanici_siralama = []
         if not self.calisma_listesi: return
-        
         self.aktif_veri = random.choice(self.calisma_listesi)
         self.lbl_ipucu.text = f"[b]{self.aktif_veri['tr']}[/b]"
         self.lbl_ipucu.markup = True
         
         kelime = self.aktif_veri['en']
-        
-        # --- PARANTEZ İÇİNİ SİL VE TEMİZLE ---
-        kelime_temiz = re.sub(r"\(.*?\)", "", kelime) # (v.) vb. sil
-        
-        # Sadece harfleri al
+        kelime_temiz = re.sub(r"\(.*?\)", "", kelime) 
         temiz_kelime = re.sub(r'[^a-zA-Z]', '', kelime_temiz).lower()
         self.dogru_siralama = list(temiz_kelime)
         
@@ -485,7 +549,6 @@ class EtkinlikEkrani(Screen):
         self.aktif_veri = None
         self.dogru_siralama = []
         self.kullanici_siralama = []
-        self.calisma_listesi = []
         
         main_layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
         self.lbl_ipucu = Label(text="Cümleyi Oluşturun", font_size='20sp', size_hint=(1, 0.15), halign='center', valign='middle')
@@ -515,7 +578,7 @@ class EtkinlikEkrani(Screen):
         b_menu = OzelButon(text="Menü", background_color=(0.5, 0.5, 0.5, 1), size_hint=(1, None), height=HEDEF_BTN)
         b_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         b_ileri = OzelButon(text="İleri", background_color=(0.2, 0.6, 0.8, 1), size_hint=(1, None), height=HEDEF_BTN)
-        b_ileri.bind(on_press=lambda x: self.yeni_soru())
+        b_ileri.bind(on_press=lambda x: self.baslat())
         nav.add_widget(b_menu); nav.add_widget(b_ileri)
         main_layout.add_widget(nav)
         
@@ -525,8 +588,11 @@ class EtkinlikEkrani(Screen):
         self.rect.pos = instance.pos
         self.rect.size = instance.size
 
-    def baslat(self, liste):
-        self.calisma_listesi = liste
+    def baslat(self, liste=None):
+        if liste:
+            self.calisma_listesi = liste
+        elif not self.calisma_listesi and YONETICI.veriler:
+            self.calisma_listesi = YONETICI.veriler
         self.yeni_soru()
 
     def yeni_soru(self):
