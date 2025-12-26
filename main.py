@@ -33,8 +33,17 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bn
 CSV_URL_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTT6HjmaATaFYx7ahx4vG5lOfOzVnUEUwjaGZqSVnCPU36oggWBLqW5zoFP4C9t8IVMRg1jYez9rwB7/pub?output=csv"
 
 Window.clearcolor = (0.15, 0.15, 0.15, 1)
-AYARLAR = {"hiz": 1.0}
+
+# --- VERİ TABANI VE AYAR YÜKLEME ---
 STORE = JsonStore('user_data.json')
+
+# Varsayılan hızı 1.0 yap, eğer kayıtlı varsa onu yükle
+kayitli_hiz = 1.0
+if STORE.exists('ayarlar'):
+    if 'hiz' in STORE.get('ayarlar'):
+        kayitli_hiz = STORE.get('ayarlar')['hiz']
+
+AYARLAR = {"hiz": kayitli_hiz}
 
 YEDEK_VERILER = [
     {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
@@ -249,7 +258,7 @@ class AyarlarEkrani(Screen):
         
         grid = GridLayout(cols=3, spacing=10, size_hint=(1, 0.2))
         self.btn_yavas = ToggleButton(text="Yavaş\n(0.75x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
-        self.btn_normal = ToggleButton(text="Normal\n(1.0x)", group='hiz', state='down', background_color=(0.2, 0.6, 0.8, 1))
+        self.btn_normal = ToggleButton(text="Normal\n(1.0x)", group='hiz', background_color=(0.2, 0.6, 0.8, 1))
         self.btn_hizli = ToggleButton(text="Hızlı\n(1.25x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
         
         self.btn_yavas.bind(on_press=lambda x: self.hiz_set(0.75))
@@ -260,16 +269,36 @@ class AyarlarEkrani(Screen):
         layout.add_widget(grid)
         layout.add_widget(Label(size_hint=(1, 0.4))) 
         
-        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=168)
+        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=150)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
         self.add_widget(layout)
 
+    def on_pre_enter(self):
+        # Ekran açılırken kayıtlı hıza göre butonları boya
+        hiz = AYARLAR["hiz"]
+        self.gorsel_guncelle(hiz)
+
+    def gorsel_guncelle(self, hiz):
+        # Buton durumlarını (basılı görünümü) ayarla
+        self.btn_yavas.state = 'down' if hiz == 0.75 else 'normal'
+        self.btn_normal.state = 'down' if hiz == 1.0 else 'normal'
+        self.btn_hizli.state = 'down' if hiz == 1.25 else 'normal'
+        
+        # Renkleri güncelle
+        def renk(btn, aktif): btn.background_color = (0.2, 0.6, 0.8, 1) if aktif else (0.3, 0.3, 0.3, 1)
+        renk(self.btn_yavas, hiz == 0.75)
+        renk(self.btn_normal, hiz == 1.0)
+        renk(self.btn_hizli, hiz == 1.25)
+
     def hiz_set(self, deger):
         AYARLAR["hiz"] = deger
-        def renk(btn, aktif): btn.background_color = (0.2, 0.6, 0.8, 1) if aktif else (0.3, 0.3, 0.3, 1)
-        renk(self.btn_yavas, deger == 0.75); renk(self.btn_normal, deger == 1.0); renk(self.btn_hizli, deger == 1.25)
+        # KAYIT İŞLEMİ (Kalıcı Hafıza)
+        STORE.put('ayarlar', hiz=deger)
+        
+        self.gorsel_guncelle(deger)
         SES.oku("Test speed")
+
     def don(self, instance): self.manager.current = 'menu'
 
 class AnaMenu(Screen):
@@ -277,19 +306,18 @@ class AnaMenu(Screen):
         super().__init__(**kwargs)
         self.main_box = BoxLayout(orientation='vertical', padding=0, spacing=0)
         
-        # Başlık (Sabit)
         baslik_kutusu = AnchorLayout(anchor_x='center', anchor_y='center', size_hint_y=0.15)
         lbl_baslik = Label(text="İngilizce Ezber", font_size='40sp', bold=True)
         baslik_kutusu.add_widget(lbl_baslik)
         self.main_box.add_widget(baslik_kutusu)
         
-        # Orta Alan (Scroll)
         orta_alan = AnchorLayout(anchor_x='center', anchor_y='center', size_hint_y=0.85)
         self.scroll = ScrollView(size_hint=(0.9, None), do_scroll_x=False)
         self.grid_menu = GridLayout(cols=1, spacing=20, size_hint_y=None, padding=[0, 20, 0, 20])
         self.grid_menu.bind(minimum_height=self.grid_menu.setter('height'))
         
-        HEDEF_YUKSEKLIK = 168
+        # --- BUTON YÜKSEKLİĞİ %10 KÜÇÜLTÜLDÜ (168 -> 150) ---
+        HEDEF_YUKSEKLIK = 150
         
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.level_sec("kelime"))
@@ -303,13 +331,11 @@ class AnaMenu(Screen):
         btn_cumle_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_cumle_etkinlik.bind(on_press=lambda x: self.level_sec("etkinlik_cumle"))
         
-        # --- DIL KURSU (KELİME) ---
         btn_dil_kursu = OzelButon(text="Dil Kursu Kelimeleri", background_color=(0.9, 0.3, 0.3, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_dil_kursu.bind(on_press=lambda x: self.dil_kursu_baslat("kelime"))
+        btn_dil_kursu.bind(on_press=self.dil_kursu_baslat_kelime)
 
-        # --- DIL KURSU (CÜMLE) ---
         btn_dil_kursu_cumle = OzelButon(text="Dil Kursu Cümleleri", background_color=(0.8, 0.4, 0.2, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_dil_kursu_cumle.bind(on_press=lambda x: self.dil_kursu_baslat("cumle"))
+        btn_dil_kursu_cumle.bind(on_press=self.dil_kursu_baslat_cumle)
         
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
@@ -329,7 +355,7 @@ class AnaMenu(Screen):
         self.grid_menu.add_widget(btn_kelime_etkinlik)
         self.grid_menu.add_widget(btn_cumle_etkinlik)
         self.grid_menu.add_widget(btn_dil_kursu)
-        self.grid_menu.add_widget(btn_dil_kursu_cumle) # Yeni buton
+        self.grid_menu.add_widget(btn_dil_kursu_cumle)
         self.grid_menu.add_widget(btn3)
         self.grid_menu.add_widget(alt_grid)
         self.grid_menu.add_widget(btn5)
@@ -358,12 +384,18 @@ class AnaMenu(Screen):
         ekran.modu_ayarla(mod_tipi)
         self.manager.current = 'level'
 
-    def dil_kursu_baslat(self, mod_tipi):
+    def dil_kursu_baslat_kelime(self, instance):
+        self.baslat_dil_kursu("kelime")
+    
+    def dil_kursu_baslat_cumle(self, instance):
+        self.baslat_dil_kursu("cumle")
+
+    def baslat_dil_kursu(self, mod_tipi):
         if not YONETICI.dil_kursu_veriler:
             Popup(title='Uyarı', content=Label(text='Dil Kursu Listesi Boş!'), size_hint=(0.8, 0.4)).open()
             return
         ekran = self.manager.get_screen('calisma')
-        ekran.baslat_ozel(mod_tipi, YONETICI.dil_kursu_veriler) # Modu gönderiyoruz
+        ekran.baslat_ozel(mod_tipi, YONETICI.dil_kursu_veriler)
         self.manager.current = 'calisma'
 
     def gecis(self, m):
@@ -455,7 +487,7 @@ class InfoEkrani(Screen):
         layout.add_widget(self.lbl)
         imza = Label(text="Hazırlayan: Murat SERT", font_size='20sp', bold=True, color=(0.7, 0.7, 0.7, 1), size_hint=(1, 0.1))
         layout.add_widget(imza)
-        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=168)
+        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=150)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
         self.add_widget(layout)
