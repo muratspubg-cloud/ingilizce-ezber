@@ -8,6 +8,7 @@ import re
 import math
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.stacklayout import StackLayout
 from kivy.uix.scrollview import ScrollView
@@ -40,10 +41,10 @@ YEDEK_VERILER = [
     {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"}
 ]
 
-# Dil kursu için yedek veri
 DIL_KURSU_YEDEK = [
-    {"tr": "Öğrenci", "en": "Student", "ipa": "", "okunus": "sityudınt", "cen": "I am a student", "ctr": "Ben bir öğrenciyim"},
-    {"tr": "Öğretmen", "en": "Teacher", "ipa": "", "okunus": "tiçır", "cen": "She is a teacher", "ctr": "O bir öğretmen"}
+    {"tr": "Araba", "en": "Car", "ipa": "/kɑːr/", "okunus": "kar", "cen": "My father has a red car", "ctr": "Babamın kırmızı bir arabası var"},
+    {"tr": "Öğretmen", "en": "Teacher", "ipa": "/ˈtiːtʃər/", "okunus": "tiiçır", "cen": "She is a good teacher", "ctr": "O iyi bir öğretmendir"},
+    {"tr": "Tanımak", "en": "Recognise", "ipa": "/ˈrekəɡnaɪz/", "okunus": "rekıgnayz", "cen": "I didn't recognise you", "ctr": "Seni tanıyamadım"}
 ]
 
 # --- 3D GÖRÜNÜMLÜ ÖZEL BUTON ---
@@ -165,7 +166,6 @@ class VeriYoneticisi:
         self.veriler = []
         self.dil_kursu_veriler = []
         
-        # İlk yükleme
         self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER)
         self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK)
 
@@ -180,10 +180,8 @@ class VeriYoneticisi:
         if not os.path.exists(yol) and os.path.exists(dosya_adi):
             try: shutil.copy(dosya_adi, yol)
             except: pass
-        
         if not os.path.exists(yol):
             self.ornek_dosya_olustur(yol, dosya_adi)
-            
         return yol
 
     def ornek_dosya_olustur(self, yol, ad):
@@ -192,7 +190,7 @@ class VeriYoneticisi:
             with open(yol, 'w', encoding='utf-8-sig') as f:
                 f.write("Sıra;TR;EN;IPA;Okunuş;CümleEN;CümleTR\n")
                 for v in veri:
-                    f.write(f"1;{v['tr']};{v['en']};;{v['okunus']};{v['cen']};{v['ctr']}\n")
+                    f.write(f"1;{v['tr']};{v['en']};{v.get('ipa','')};{v['okunus']};{v.get('cen','')};{v.get('ctr','')}\n")
         except: pass
 
     def internetten_guncelle(self):
@@ -209,7 +207,6 @@ class VeriYoneticisi:
             
             self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER)
             self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK)
-            
             return True, "Tüm Listeler Güncellendi!"
         except Exception as e:
             return False, f"Hata: {str(e)}"
@@ -240,7 +237,6 @@ class VeriYoneticisi:
                                 "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
                             })
             except: pass
-        
         return liste if liste else yedek_veri.copy()
 
 YONETICI = VeriYoneticisi()
@@ -279,14 +275,21 @@ class AyarlarEkrani(Screen):
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
-        self.layout.add_widget(Label(text="İngilizce Ezber", font_size='40sp', bold=True, size_hint=(1, 0.15)))
+        self.main_box = BoxLayout(orientation='vertical', padding=0, spacing=0)
+        
+        # Başlık (Sabit)
+        baslik_kutusu = AnchorLayout(anchor_x='center', anchor_y='center', size_hint_y=0.15)
+        lbl_baslik = Label(text="İngilizce Ezber", font_size='40sp', bold=True)
+        baslik_kutusu.add_widget(lbl_baslik)
+        self.main_box.add_widget(baslik_kutusu)
+        
+        # Orta Alan (Scroll)
+        orta_alan = AnchorLayout(anchor_x='center', anchor_y='center', size_hint_y=0.85)
+        self.scroll = ScrollView(size_hint=(0.9, None), do_scroll_x=False)
+        self.grid_menu = GridLayout(cols=1, spacing=20, size_hint_y=None, padding=[0, 20, 0, 20])
+        self.grid_menu.bind(minimum_height=self.grid_menu.setter('height'))
         
         HEDEF_YUKSEKLIK = 168
-        
-        scroll = ScrollView(size_hint=(1, 0.85))
-        grid_menu = GridLayout(cols=1, spacing=15, size_hint_y=None)
-        grid_menu.bind(minimum_height=grid_menu.setter('height'))
         
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.level_sec("kelime"))
@@ -300,8 +303,13 @@ class AnaMenu(Screen):
         btn_cumle_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_cumle_etkinlik.bind(on_press=lambda x: self.level_sec("etkinlik_cumle"))
         
+        # --- DIL KURSU (KELİME) ---
         btn_dil_kursu = OzelButon(text="Dil Kursu Kelimeleri", background_color=(0.9, 0.3, 0.3, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_dil_kursu.bind(on_press=self.dil_kursu_baslat)
+        btn_dil_kursu.bind(on_press=lambda x: self.dil_kursu_baslat("kelime"))
+
+        # --- DIL KURSU (CÜMLE) ---
+        btn_dil_kursu_cumle = OzelButon(text="Dil Kursu Cümleleri", background_color=(0.8, 0.4, 0.2, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
+        btn_dil_kursu_cumle.bind(on_press=lambda x: self.dil_kursu_baslat("cumle"))
         
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
@@ -316,18 +324,27 @@ class AnaMenu(Screen):
         btn5 = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn5.bind(on_press=lambda x: sys.exit())
         
-        grid_menu.add_widget(btn1)
-        grid_menu.add_widget(btn2)
-        grid_menu.add_widget(btn_kelime_etkinlik)
-        grid_menu.add_widget(btn_cumle_etkinlik)
-        grid_menu.add_widget(btn_dil_kursu)
-        grid_menu.add_widget(btn3)
-        grid_menu.add_widget(alt_grid)
-        grid_menu.add_widget(btn5)
+        self.grid_menu.add_widget(btn1)
+        self.grid_menu.add_widget(btn2)
+        self.grid_menu.add_widget(btn_kelime_etkinlik)
+        self.grid_menu.add_widget(btn_cumle_etkinlik)
+        self.grid_menu.add_widget(btn_dil_kursu)
+        self.grid_menu.add_widget(btn_dil_kursu_cumle) # Yeni buton
+        self.grid_menu.add_widget(btn3)
+        self.grid_menu.add_widget(alt_grid)
+        self.grid_menu.add_widget(btn5)
         
-        scroll.add_widget(grid_menu)
-        self.layout.add_widget(scroll)
-        self.add_widget(self.layout)
+        self.grid_menu.bind(height=self.update_scroll_height)
+        Window.bind(height=self.update_scroll_height)
+        self.scroll.add_widget(self.grid_menu)
+        orta_alan.add_widget(self.scroll)
+        self.main_box.add_widget(orta_alan)
+        self.add_widget(self.main_box)
+
+    def update_scroll_height(self, *args):
+        max_h = Window.height * 0.85
+        content_h = self.grid_menu.height
+        self.scroll.height = min(max_h, content_h)
 
     def guncelle(self, i):
         p=Popup(title='İşlem', content=Label(text='Tüm Listeler İndiriliyor...'), size_hint=(0.7, 0.3)); p.open()
@@ -341,12 +358,12 @@ class AnaMenu(Screen):
         ekran.modu_ayarla(mod_tipi)
         self.manager.current = 'level'
 
-    def dil_kursu_baslat(self, instance):
+    def dil_kursu_baslat(self, mod_tipi):
         if not YONETICI.dil_kursu_veriler:
             Popup(title='Uyarı', content=Label(text='Dil Kursu Listesi Boş!'), size_hint=(0.8, 0.4)).open()
             return
         ekran = self.manager.get_screen('calisma')
-        ekran.baslat_ozel("kelime", YONETICI.dil_kursu_veriler) 
+        ekran.baslat_ozel(mod_tipi, YONETICI.dil_kursu_veriler) # Modu gönderiyoruz
         self.manager.current = 'calisma'
 
     def gecis(self, m):
