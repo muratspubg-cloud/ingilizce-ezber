@@ -32,19 +32,14 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bn
 # 2. Dil Kursu Listesi
 CSV_URL_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTT6HjmaATaFYx7ahx4vG5lOfOzVnUEUwjaGZqSVnCPU36oggWBLqW5zoFP4C9t8IVMRg1jYez9rwB7/pub?output=csv"
 
-Window.clearcolor = (0.15, 0.15, 0.15, 1)
+# 3. English - English Listesi (YENİ GÜNCELLENEN LİNK)
+CSV_URL_3 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFXYrFIbxrULpqPNYSks0xFVT2lfFrpuIU1eXJoNPg9CXzB126Nb7eVXQ7kirHLz_Xj7CiYGbBnBBK/pub?output=csv"
 
-# --- VERİ TABANI VE AYAR YÜKLEME ---
+Window.clearcolor = (0.15, 0.15, 0.15, 1)
+AYARLAR = {"hiz": 1.0}
 STORE = JsonStore('user_data.json')
 
-# Varsayılan hızı 1.0 yap, eğer kayıtlı varsa onu yükle
-kayitli_hiz = 1.0
-if STORE.exists('ayarlar'):
-    if 'hiz' in STORE.get('ayarlar'):
-        kayitli_hiz = STORE.get('ayarlar')['hiz']
-
-AYARLAR = {"hiz": kayitli_hiz}
-
+# --- YEDEK VERİLER (ÇÖKME ÖNLEYİCİ) ---
 YEDEK_VERILER = [
     {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
     {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"}
@@ -52,8 +47,14 @@ YEDEK_VERILER = [
 
 DIL_KURSU_YEDEK = [
     {"tr": "Araba", "en": "Car", "ipa": "/kɑːr/", "okunus": "kar", "cen": "My father has a red car", "ctr": "Babamın kırmızı bir arabası var"},
-    {"tr": "Öğretmen", "en": "Teacher", "ipa": "/ˈtiːtʃər/", "okunus": "tiiçır", "cen": "She is a good teacher", "ctr": "O iyi bir öğretmendir"},
-    {"tr": "Tanımak", "en": "Recognise", "ipa": "/ˈrekəɡnaɪz/", "okunus": "rekıgnayz", "cen": "I didn't recognise you", "ctr": "Seni tanıyamadım"}
+    {"tr": "Öğretmen", "en": "Teacher", "ipa": "/ˈtiːtʃər/", "okunus": "tiiçır", "cen": "She is a good teacher", "ctr": "O iyi bir öğretmendir"}
+]
+
+# English - English Yedekleri (Yeni Eklendi)
+ENG_ENG_YEDEK = [
+    {"word": "Diligent", "def": "Having or showing care and conscientiousness in one's work or duties.", "tr": "Çalışkan", "ex": "Many caves are located only after a diligent search."},
+    {"word": "Obscure", "def": "Not discovered or known about; uncertain.", "tr": "Belirsiz", "ex": "His origins and parentage are obscure."},
+    {"word": "Resilient", "def": "Able to withstand or recover quickly from difficult conditions.", "tr": "Dirençli", "ex": "Babies are generally far more resilient than new parents realize."}
 ]
 
 # --- 3D GÖRÜNÜMLÜ ÖZEL BUTON ---
@@ -78,10 +79,10 @@ class OzelButon(Button):
         with self.canvas.before:
             r, g, b, a = self.ana_renk
             Color(r * 0.6, g * 0.6, b * 0.6, 1)
-            offset = 8 if self.state == 'normal' else 0
+            offset = 6 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
             Color(r, g, b, 1)
-            y_pos = self.y if self.state == 'normal' else self.y - 8
+            y_pos = self.y if self.state == 'normal' else self.y - 6
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
 # --- SPINNER AYARLARI ---
@@ -169,14 +170,20 @@ class VeriYoneticisi:
     def __init__(self):
         self.ana_dosya = 'kelimeler.csv'
         self.dil_dosya = 'dilkursu.csv'
+        self.eng_dosya = 'eng_eng.csv'
+        
         self.dosya_yolu_1 = self.yol_bul(self.ana_dosya)
         self.dosya_yolu_2 = self.yol_bul(self.dil_dosya)
+        self.dosya_yolu_3 = self.yol_bul(self.eng_dosya)
         
         self.veriler = []
         self.dil_kursu_veriler = []
+        self.eng_eng_veriler = []
         
-        self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER)
-        self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK)
+        # Yüklemeler
+        self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER, tip="standart")
+        self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK, tip="standart")
+        self.eng_eng_veriler = self.yukle(self.dosya_yolu_3, ENG_ENG_YEDEK, tip="eng_eng")
 
     def yol_bul(self, dosya_adi):
         if platform == 'android':
@@ -195,11 +202,16 @@ class VeriYoneticisi:
 
     def ornek_dosya_olustur(self, yol, ad):
         try:
-            veri = DIL_KURSU_YEDEK if ad == 'dilkursu.csv' else YEDEK_VERILER
             with open(yol, 'w', encoding='utf-8-sig') as f:
-                f.write("Sıra;TR;EN;IPA;Okunuş;CümleEN;CümleTR\n")
-                for v in veri:
-                    f.write(f"1;{v['tr']};{v['en']};{v.get('ipa','')};{v['okunus']};{v.get('cen','')};{v.get('ctr','')}\n")
+                if ad == 'eng_eng.csv':
+                    f.write("Sıra;Word;Definition;TR;Example\n")
+                    for v in ENG_ENG_YEDEK:
+                        f.write(f"1;{v['word']};{v['def']};{v['tr']};{v['ex']}\n")
+                else:
+                    veri = DIL_KURSU_YEDEK if ad == 'dilkursu.csv' else YEDEK_VERILER
+                    f.write("Sıra;TR;EN;IPA;Okunuş;CümleEN;CümleTR\n")
+                    for v in veri:
+                        f.write(f"1;{v['tr']};{v['en']};{v.get('ipa','')};{v['okunus']};{v.get('cen','')};{v.get('ctr','')}\n")
         except: pass
 
     def internetten_guncelle(self):
@@ -214,8 +226,14 @@ class VeriYoneticisi:
                 r2.raise_for_status()
                 with open(self.dosya_yolu_2, 'wb') as f: f.write(r2.content)
             
-            self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER)
-            self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK)
+            if "http" in CSV_URL_3:
+                r3 = requests.get(CSV_URL_3, timeout=15)
+                r3.raise_for_status()
+                with open(self.dosya_yolu_3, 'wb') as f: f.write(r3.content)
+            
+            self.veriler = self.yukle(self.dosya_yolu_1, YEDEK_VERILER, tip="standart")
+            self.dil_kursu_veriler = self.yukle(self.dosya_yolu_2, DIL_KURSU_YEDEK, tip="standart")
+            self.eng_eng_veriler = self.yukle(self.dosya_yolu_3, ENG_ENG_YEDEK, tip="eng_eng")
             return True, "Tüm Listeler Güncellendi!"
         except Exception as e:
             return False, f"Hata: {str(e)}"
@@ -224,7 +242,7 @@ class VeriYoneticisi:
         if not metin: return ""
         return " ".join(str(metin).replace("\\n", " ").replace("\n", " ").replace("\r", "").split())
 
-    def yukle(self, yol, yedek_veri):
+    def yukle(self, yol, yedek_veri, tip="standart"):
         liste = []
         if os.path.exists(yol):
             try:
@@ -236,16 +254,26 @@ class VeriYoneticisi:
                         reader = csv.reader(f, delimiter=delimiter)
                         rows = list(reader)
                         start = 1 if rows and "Sıra" in str(rows[0][0]) else 0
+                        
                         for i in range(start, len(rows)):
                             row = rows[i]
                             if not row or len(row) < 3: continue
-                            if not row[1].strip() or not row[2].strip(): continue
                             def safe(idx): return self.temizle(row[idx]) if idx < len(row) else ""
-                            liste.append({
-                                "tr": safe(1), "en": safe(2), "ipa": safe(3), 
-                                "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
-                            })
-            except: pass
+                            
+                            if tip == "standart":
+                                liste.append({
+                                    "tr": safe(1), "en": safe(2), "ipa": safe(3), 
+                                    "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
+                                })
+                            elif tip == "eng_eng":
+                                # Yapı: No; Word; Def; TR; Ex
+                                liste.append({
+                                    "word": safe(1), 
+                                    "def": safe(2), 
+                                    "tr": safe(3), 
+                                    "ex": safe(4)
+                                })
+            except Exception as e: print(f"Hata: {e}")
         return liste if liste else yedek_veri.copy()
 
 YONETICI = VeriYoneticisi()
@@ -258,7 +286,7 @@ class AyarlarEkrani(Screen):
         
         grid = GridLayout(cols=3, spacing=10, size_hint=(1, 0.2))
         self.btn_yavas = ToggleButton(text="Yavaş\n(0.75x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
-        self.btn_normal = ToggleButton(text="Normal\n(1.0x)", group='hiz', background_color=(0.2, 0.6, 0.8, 1))
+        self.btn_normal = ToggleButton(text="Normal\n(1.0x)", group='hiz', state='down', background_color=(0.2, 0.6, 0.8, 1))
         self.btn_hizli = ToggleButton(text="Hızlı\n(1.25x)", group='hiz', background_color=(0.3, 0.3, 0.3, 1))
         
         self.btn_yavas.bind(on_press=lambda x: self.hiz_set(0.75))
@@ -269,23 +297,19 @@ class AyarlarEkrani(Screen):
         layout.add_widget(grid)
         layout.add_widget(Label(size_hint=(1, 0.4))) 
         
-        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=150)
+        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=100)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
         self.add_widget(layout)
 
     def on_pre_enter(self):
-        # Ekran açılırken kayıtlı hıza göre butonları boya
         hiz = AYARLAR["hiz"]
         self.gorsel_guncelle(hiz)
 
     def gorsel_guncelle(self, hiz):
-        # Buton durumlarını (basılı görünümü) ayarla
         self.btn_yavas.state = 'down' if hiz == 0.75 else 'normal'
         self.btn_normal.state = 'down' if hiz == 1.0 else 'normal'
         self.btn_hizli.state = 'down' if hiz == 1.25 else 'normal'
-        
-        # Renkleri güncelle
         def renk(btn, aktif): btn.background_color = (0.2, 0.6, 0.8, 1) if aktif else (0.3, 0.3, 0.3, 1)
         renk(self.btn_yavas, hiz == 0.75)
         renk(self.btn_normal, hiz == 1.0)
@@ -293,9 +317,7 @@ class AyarlarEkrani(Screen):
 
     def hiz_set(self, deger):
         AYARLAR["hiz"] = deger
-        # KAYIT İŞLEMİ (Kalıcı Hafıza)
         STORE.put('ayarlar', hiz=deger)
-        
         self.gorsel_guncelle(deger)
         SES.oku("Test speed")
 
@@ -316,8 +338,8 @@ class AnaMenu(Screen):
         self.grid_menu = GridLayout(cols=1, spacing=20, size_hint_y=None, padding=[0, 20, 0, 20])
         self.grid_menu.bind(minimum_height=self.grid_menu.setter('height'))
         
-        # --- BUTON YÜKSEKLİĞİ %10 KÜÇÜLTÜLDÜ (168 -> 150) ---
-        HEDEF_YUKSEKLIK = 150
+        # --- BUTON BOYUTU 100 OLARAK GÜNCELLENDİ ---
+        HEDEF_YUKSEKLIK = 100
         
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.level_sec("kelime"))
@@ -336,6 +358,10 @@ class AnaMenu(Screen):
 
         btn_dil_kursu_cumle = OzelButon(text="Dil Kursu Cümleleri", background_color=(0.8, 0.4, 0.2, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_dil_kursu_cumle.bind(on_press=self.dil_kursu_baslat_cumle)
+        
+        # English - English Butonu
+        btn_eng_eng = OzelButon(text="English - English", background_color=(0.0, 0.7, 0.7, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
+        btn_eng_eng.bind(on_press=self.eng_eng_baslat)
         
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
@@ -356,6 +382,7 @@ class AnaMenu(Screen):
         self.grid_menu.add_widget(btn_cumle_etkinlik)
         self.grid_menu.add_widget(btn_dil_kursu)
         self.grid_menu.add_widget(btn_dil_kursu_cumle)
+        self.grid_menu.add_widget(btn_eng_eng)
         self.grid_menu.add_widget(btn3)
         self.grid_menu.add_widget(alt_grid)
         self.grid_menu.add_widget(btn5)
@@ -385,17 +412,23 @@ class AnaMenu(Screen):
         self.manager.current = 'level'
 
     def dil_kursu_baslat_kelime(self, instance):
-        self.baslat_dil_kursu("kelime")
+        self.baslat_calisma("kelime", YONETICI.dil_kursu_veriler)
     
     def dil_kursu_baslat_cumle(self, instance):
-        self.baslat_dil_kursu("cumle")
+        self.baslat_calisma("cumle", YONETICI.dil_kursu_veriler)
 
-    def baslat_dil_kursu(self, mod_tipi):
-        if not YONETICI.dil_kursu_veriler:
-            Popup(title='Uyarı', content=Label(text='Dil Kursu Listesi Boş!'), size_hint=(0.8, 0.4)).open()
+    def eng_eng_baslat(self, instance):
+        if not YONETICI.eng_eng_veriler:
+            Popup(title='Uyarı', content=Label(text='Eng-Eng Listesi Boş!'), size_hint=(0.8, 0.4)).open()
+            return
+        self.baslat_calisma("eng_eng", YONETICI.eng_eng_veriler)
+
+    def baslat_calisma(self, mod, liste):
+        if not liste:
+            Popup(title='Uyarı', content=Label(text='Liste Boş!'), size_hint=(0.8, 0.4)).open()
             return
         ekran = self.manager.get_screen('calisma')
-        ekran.baslat_ozel(mod_tipi, YONETICI.dil_kursu_veriler)
+        ekran.baslat_ozel(mod, liste)
         self.manager.current = 'calisma'
 
     def gecis(self, m):
@@ -487,14 +520,15 @@ class InfoEkrani(Screen):
         layout.add_widget(self.lbl)
         imza = Label(text="Hazırlayan: Murat SERT", font_size='20sp', bold=True, color=(0.7, 0.7, 0.7, 1), size_hint=(1, 0.1))
         layout.add_widget(imza)
-        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=150)
+        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=100)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
         self.add_widget(layout)
     def on_pre_enter(self):
         s = len(YONETICI.veriler)
         s2 = len(YONETICI.dil_kursu_veriler)
-        self.lbl.text = f'Ana Liste: "{s}"\nDil Kursu: "{s2}"'
+        s3 = len(YONETICI.eng_eng_veriler)
+        self.lbl.text = f'Ana Liste: "{s}"\nDil Kursu: "{s2}"\nEng-Eng: "{s3}"'
 
 class KelimeEtkinlikEkrani(Screen):
     def __init__(self, **kwargs):
@@ -534,7 +568,6 @@ class KelimeEtkinlikEkrani(Screen):
         b_ileri.bind(on_press=lambda x: self.yeni_soru())
         nav.add_widget(b_menu); nav.add_widget(b_ileri)
         main_layout.add_widget(nav)
-        
         self.add_widget(main_layout)
 
     def guncelle_rect(self, instance, value):
@@ -718,13 +751,34 @@ class Calisma(Screen):
 
     def seslendir(self, i):
         if self.aktif: 
-            ham_metin = self.aktif['en'] if self.mod=="kelime" else self.aktif['cen']
-            temiz_metin = re.sub(r"\(.*?\)", "", ham_metin).strip()
-            SES.oku(temiz_metin)
+            # --- YENİ MOD: ENG-ENG SESLENDİRME ---
+            if self.mod == "eng_eng":
+                metin = f"{self.aktif['word']}. {self.aktif['ex']}"
+                SES.oku(metin)
+            else:
+                ham_metin = self.aktif['en'] if self.mod=="kelime" else self.aktif['cen']
+                temiz_metin = re.sub(r"\(.*?\)", "", ham_metin).strip()
+                SES.oku(temiz_metin)
             
     def guncelle(self):
         self.kart.markup = True; v = self.aktif
         if not v: return
+        
+        # --- YENİ MOD: ENG-ENG GÖRÜNÜM ---
+        if self.mod == "eng_eng":
+            if not self.cevrildi:
+                self.kart.ana_renk = get_color_from_hex('#008080')
+                self.kart.guncelle_canvas()
+                self.kart.color = (1,1,1,1)
+                self.kart.text = f"[size=32][b]{v['word']}[/b][/size]\n\n{v['def']}\n\n[i]\"{v['ex']}\"[/i]"
+            else:
+                self.kart.ana_renk = get_color_from_hex('#FBC02D')
+                self.kart.guncelle_canvas()
+                self.kart.color = (0,0,0,1)
+                self.kart.text = f"[b]{v['tr']}[/b]"
+            return
+
+        # --- DİĞER MODLAR ---
         if not self.cevrildi:
             self.kart.ana_renk = get_color_from_hex('#37474F')
             self.kart.guncelle_canvas()
@@ -747,7 +801,10 @@ class Calisma(Screen):
         if getattr(self,'aktif',None): self.gecmis.append({"v":self.aktif,"y":self.yon})
         try:
             self.aktif=random.choice(self.calisma_listesi)
-            self.yon=random.choice(["tr_to_en","en_to_tr"])
+            if self.mod == "eng_eng":
+                self.yon = "eng_eng"
+            else:
+                self.yon=random.choice(["tr_to_en","en_to_tr"])
             self.cevrildi=False; self.guncelle()
         except: pass
     def geri(self, i): 
