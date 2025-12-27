@@ -291,8 +291,7 @@ class AyarlarEkrani(Screen):
         layout.add_widget(grid)
         layout.add_widget(Label(size_hint=(1, 0.4))) 
         
-        # Dön butonu 110 olarak ayarlandı
-        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=110)
+        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=125)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
         self.add_widget(layout)
@@ -333,8 +332,8 @@ class AnaMenu(Screen):
         self.grid_menu = GridLayout(cols=1, spacing=20, size_hint_y=None, padding=[0, 20, 0, 20])
         self.grid_menu.bind(minimum_height=self.grid_menu.setter('height'))
         
-        # --- BUTON BOYUTU %10 BÜYÜTÜLDÜ (100 -> 110) ---
-        HEDEF_YUKSEKLIK = 110
+        # --- BUTON BOYUTU %10 BÜYÜTÜLDÜ (110 -> 125) ---
+        HEDEF_YUKSEKLIK = 125
         
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.level_sec("kelime"))
@@ -354,9 +353,8 @@ class AnaMenu(Screen):
         btn_dil_kursu_cumle = OzelButon(text="Dil Kursu Cümleleri", background_color=(0.8, 0.4, 0.2, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_dil_kursu_cumle.bind(on_press=self.dil_kursu_baslat_cumle)
         
-        # --- ENGLISH-ENGLISH BUTONU ---
+        # English - English Butonu
         btn_eng_eng = OzelButon(text="English - English", background_color=(0.0, 0.7, 0.7, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        # ARTIK LEVEL SEÇİMİNE GİDİYOR
         btn_eng_eng.bind(on_press=lambda x: self.level_sec("eng_eng"))
         
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
@@ -401,7 +399,6 @@ class AnaMenu(Screen):
         Popup(title='Durum', content=Label(text=m), size_hint=(0.8, 0.4)).open()
 
     def level_sec(self, mod_tipi):
-        # Genel Veri Kontrolü (Hangi modsa onun listesine bak)
         if mod_tipi == "eng_eng" and not YONETICI.eng_eng_veriler:
              Popup(title='Uyarı', content=Label(text='Eng-Eng Verisi Yok!'), size_hint=(0.8,0.4)).open(); return
         elif mod_tipi != "eng_eng" and not YONETICI.veriler:
@@ -418,7 +415,6 @@ class AnaMenu(Screen):
         self.baslat_calisma("cumle", YONETICI.dil_kursu_veriler)
 
     def eng_eng_baslat(self, instance):
-        # Bu fonksiyon artık level_sec tarafından çağrılıyor
         pass
 
     def baslat_calisma(self, mod, liste):
@@ -465,7 +461,6 @@ class LevelEkrani(Screen):
         self.add_widget(self.govde)
 
     def on_pre_enter(self):
-        # Hangi listeye göre level hesaplanacak?
         if self.hedef_mod == "eng_eng":
             aktif_liste = YONETICI.eng_eng_veriler
         else:
@@ -499,7 +494,6 @@ class LevelEkrani(Screen):
             bitis = baslangic + kelime_basi
             STORE.put('ilerleme', son_level=text)
             
-            # Doğru listeden veriyi çek
             if self.hedef_mod == "eng_eng":
                 secili_liste = YONETICI.eng_eng_veriler[baslangic:bitis]
             else:
@@ -508,7 +502,6 @@ class LevelEkrani(Screen):
             if not secili_liste:
                 Popup(title='Hata', content=Label(text='Bu Level Boş!'), size_hint=(0.6, 0.3)).open(); return
 
-            # Yönlendirme
             if self.hedef_mod in ["kelime", "cumle", "eng_eng"]:
                 ekran = self.manager.get_screen('calisma')
                 ekran.baslat_ozel(self.hedef_mod, secili_liste)
@@ -533,7 +526,7 @@ class InfoEkrani(Screen):
         layout.add_widget(self.lbl)
         imza = Label(text="Hazırlayan: Murat SERT", font_size='20sp', bold=True, color=(0.7, 0.7, 0.7, 1), size_hint=(1, 0.1))
         layout.add_widget(imza)
-        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=110)
+        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=125)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
         self.add_widget(layout)
@@ -777,15 +770,17 @@ class Calisma(Screen):
         self.kart.markup = True; v = self.aktif
         if not v: return
         
-        # ENG-ENG MODU (YENİ FONT AYARLARI)
+        # --- FONT EŞİTLEME (İSTEK ÜZERİNE GÜNCELLENDİ) ---
         if self.mod == "eng_eng":
             if not self.cevrildi:
                 self.kart.ana_renk = get_color_from_hex('#008080')
                 self.kart.guncelle_canvas()
                 self.kart.color = (1,1,1,1)
                 
-                # --- İSTEK: KELİME 24sp (DAHA BÜYÜK), DİĞERLERİ 22sp ---
-                self.kart.text = f"[size=24][b]{v['word']}[/b][/size]\n\n[size=22]{v['def']}\n\n[i]\"{v['ex']}\"[/i][/size]"
+                # --- YAZI BOYUTU EŞİTLENDİ ---
+                # Diğer bölümlerle aynı (22sp) ancak başlık kalın, örnek italik.
+                # [size=...] etiketleri kaldırıldı.
+                self.kart.text = f"[b]{v['word']}[/b]\n\n{v['def']}\n\n[i]\"{v['ex']}\"[/i]"
             else:
                 self.kart.ana_renk = get_color_from_hex('#FBC02D')
                 self.kart.guncelle_canvas()
@@ -793,7 +788,6 @@ class Calisma(Screen):
                 self.kart.text = f"[b]{v['tr']}[/b]"
             return
 
-        # DİĞER MODLAR
         if not self.cevrildi:
             self.kart.ana_renk = get_color_from_hex('#37474F')
             self.kart.guncelle_canvas()
