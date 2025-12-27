@@ -1,4 +1,4 @@
-name: Build APK (Stable OS)
+name: Build APK (Network Fix)
 
 on:
   push:
@@ -6,14 +6,12 @@ on:
 
 jobs:
   build:
-    # KRİTİK DEĞİŞİKLİK: ubuntu-latest yerine ubuntu-22.04 kullanıyoruz.
-    # Bu sürüm, Android Build araçları için en kararlı sürümdür.
     runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
 
-      # 1. Disk Alanı Açma
+      # 1. Disk Alanı Açma (Hata önleyici)
       - name: Free Disk Space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -25,21 +23,20 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      # 2. Python Kurulumu (3.9 en güvenlisi)
+      # 2. Python Kurulumu
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # 3. Java Kurulumu (Java 17 Android SDK için standarttır)
+      # 3. Java Kurulumu
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 4. Gerekli Linux Araçlarını Kur (Ubuntu 22.04 Uyumlu)
-      # Burada libncurses5 ve libtinfo5 sorunsuz kurulacaktır.
+      # 4. Gerekli Linux Araçlarını Kur
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -56,11 +53,10 @@ jobs:
           pip install buildozer cython==0.29.33
           pip install kivy requests plyer pyjnius
 
-      # 6. APK Üretimi
+      # 6. APK Üretimi (DÜZELTME: 'yes |' komutu kaldırıldı)
       - name: Build with Buildozer
         run: |
-          # SDK lisansını otomatik kabul etmesi için komut gönderiyoruz
-          yes | buildozer android debug
+          buildozer android debug
 
       # 7. Sonucu Yükle
       - name: Upload APK
