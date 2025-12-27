@@ -32,14 +32,14 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bn
 # 2. Dil Kursu Listesi
 CSV_URL_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTT6HjmaATaFYx7ahx4vG5lOfOzVnUEUwjaGZqSVnCPU36oggWBLqW5zoFP4C9t8IVMRg1jYez9rwB7/pub?output=csv"
 
-# 3. English - English Listesi (YENİ GÜNCELLENEN LİNK)
+# 3. English - English Listesi
 CSV_URL_3 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFXYrFIbxrULpqPNYSks0xFVT2lfFrpuIU1eXJoNPg9CXzB126Nb7eVXQ7kirHLz_Xj7CiYGbBnBBK/pub?output=csv"
 
 Window.clearcolor = (0.15, 0.15, 0.15, 1)
 AYARLAR = {"hiz": 1.0}
 STORE = JsonStore('user_data.json')
 
-# --- YEDEK VERİLER (ÇÖKME ÖNLEYİCİ) ---
+# --- YEDEK VERİLER ---
 YEDEK_VERILER = [
     {"tr": "Merhaba", "en": "Hello", "ipa": "", "okunus": "helo", "cen": "Hello world", "ctr": "Merhaba dünya"},
     {"tr": "Gitmek", "en": "Go", "ipa": "", "okunus": "go", "cen": "Let's go", "ctr": "Hadi gidelim"}
@@ -50,7 +50,6 @@ DIL_KURSU_YEDEK = [
     {"tr": "Öğretmen", "en": "Teacher", "ipa": "/ˈtiːtʃər/", "okunus": "tiiçır", "cen": "She is a good teacher", "ctr": "O iyi bir öğretmendir"}
 ]
 
-# English - English Yedekleri (Yeni Eklendi)
 ENG_ENG_YEDEK = [
     {"word": "Diligent", "def": "Having or showing care and conscientiousness in one's work or duties.", "tr": "Çalışkan", "ex": "Many caves are located only after a diligent search."},
     {"word": "Obscure", "def": "Not discovered or known about; uncertain.", "tr": "Belirsiz", "ex": "His origins and parentage are obscure."},
@@ -79,10 +78,10 @@ class OzelButon(Button):
         with self.canvas.before:
             r, g, b, a = self.ana_renk
             Color(r * 0.6, g * 0.6, b * 0.6, 1)
-            offset = 6 if self.state == 'normal' else 0
+            offset = 8 if self.state == 'normal' else 0
             RoundedRectangle(pos=(self.x, self.y - offset), size=self.size, radius=[15])
             Color(r, g, b, 1)
-            y_pos = self.y if self.state == 'normal' else self.y - 6
+            y_pos = self.y if self.state == 'normal' else self.y - 8
             RoundedRectangle(pos=(self.x, y_pos), size=self.size, radius=[15])
 
 # --- SPINNER AYARLARI ---
@@ -254,7 +253,6 @@ class VeriYoneticisi:
                         reader = csv.reader(f, delimiter=delimiter)
                         rows = list(reader)
                         start = 1 if rows and "Sıra" in str(rows[0][0]) else 0
-                        
                         for i in range(start, len(rows)):
                             row = rows[i]
                             if not row or len(row) < 3: continue
@@ -266,14 +264,10 @@ class VeriYoneticisi:
                                     "okunus": safe(4), "cen": safe(5), "ctr": safe(6)
                                 })
                             elif tip == "eng_eng":
-                                # Yapı: No; Word; Def; TR; Ex
                                 liste.append({
-                                    "word": safe(1), 
-                                    "def": safe(2), 
-                                    "tr": safe(3), 
-                                    "ex": safe(4)
+                                    "word": safe(1), "def": safe(2), "tr": safe(3), "ex": safe(4)
                                 })
-            except Exception as e: print(f"Hata: {e}")
+            except: pass
         return liste if liste else yedek_veri.copy()
 
 YONETICI = VeriYoneticisi()
@@ -297,7 +291,8 @@ class AyarlarEkrani(Screen):
         layout.add_widget(grid)
         layout.add_widget(Label(size_hint=(1, 0.4))) 
         
-        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=100)
+        # Dön butonu 110 olarak ayarlandı
+        btn_geri = OzelButon(text="Kaydet ve Dön", background_color=(0.3, 0.7, 0.3, 1), size_hint=(1, None), height=110)
         btn_geri.bind(on_press=self.don)
         layout.add_widget(btn_geri)
         self.add_widget(layout)
@@ -338,8 +333,8 @@ class AnaMenu(Screen):
         self.grid_menu = GridLayout(cols=1, spacing=20, size_hint_y=None, padding=[0, 20, 0, 20])
         self.grid_menu.bind(minimum_height=self.grid_menu.setter('height'))
         
-        # --- BUTON BOYUTU 100 OLARAK GÜNCELLENDİ ---
-        HEDEF_YUKSEKLIK = 100
+        # --- BUTON BOYUTU %10 BÜYÜTÜLDÜ (100 -> 110) ---
+        HEDEF_YUKSEKLIK = 110
         
         btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn1.bind(on_press=lambda x: self.level_sec("kelime"))
@@ -359,9 +354,10 @@ class AnaMenu(Screen):
         btn_dil_kursu_cumle = OzelButon(text="Dil Kursu Cümleleri", background_color=(0.8, 0.4, 0.2, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn_dil_kursu_cumle.bind(on_press=self.dil_kursu_baslat_cumle)
         
-        # English - English Butonu
+        # --- ENGLISH-ENGLISH BUTONU ---
         btn_eng_eng = OzelButon(text="English - English", background_color=(0.0, 0.7, 0.7, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_eng_eng.bind(on_press=self.eng_eng_baslat)
+        # ARTIK LEVEL SEÇİMİNE GİDİYOR
+        btn_eng_eng.bind(on_press=lambda x: self.level_sec("eng_eng"))
         
         btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
         btn3.bind(on_press=self.guncelle)
@@ -405,8 +401,12 @@ class AnaMenu(Screen):
         Popup(title='Durum', content=Label(text=m), size_hint=(0.8, 0.4)).open()
 
     def level_sec(self, mod_tipi):
-        if not YONETICI.veriler: 
-            Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
+        # Genel Veri Kontrolü (Hangi modsa onun listesine bak)
+        if mod_tipi == "eng_eng" and not YONETICI.eng_eng_veriler:
+             Popup(title='Uyarı', content=Label(text='Eng-Eng Verisi Yok!'), size_hint=(0.8,0.4)).open(); return
+        elif mod_tipi != "eng_eng" and not YONETICI.veriler:
+             Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
+
         ekran = self.manager.get_screen('level')
         ekran.modu_ayarla(mod_tipi)
         self.manager.current = 'level'
@@ -418,10 +418,8 @@ class AnaMenu(Screen):
         self.baslat_calisma("cumle", YONETICI.dil_kursu_veriler)
 
     def eng_eng_baslat(self, instance):
-        if not YONETICI.eng_eng_veriler:
-            Popup(title='Uyarı', content=Label(text='Eng-Eng Listesi Boş!'), size_hint=(0.8, 0.4)).open()
-            return
-        self.baslat_calisma("eng_eng", YONETICI.eng_eng_veriler)
+        # Bu fonksiyon artık level_sec tarafından çağrılıyor
+        pass
 
     def baslat_calisma(self, mod, liste):
         if not liste:
@@ -467,12 +465,19 @@ class LevelEkrani(Screen):
         self.add_widget(self.govde)
 
     def on_pre_enter(self):
-        toplam_kelime = len(YONETICI.veriler)
+        # Hangi listeye göre level hesaplanacak?
+        if self.hedef_mod == "eng_eng":
+            aktif_liste = YONETICI.eng_eng_veriler
+        else:
+            aktif_liste = YONETICI.veriler
+
+        toplam_kelime = len(aktif_liste)
         kelime_basi = 25
         toplam_level = math.ceil(toplam_kelime / kelime_basi)
         level_listesi = [f"Level {i+1}" for i in range(toplam_level)]
         self.spinner.values = level_listesi
         self.spinner.text = 'Level Seçiniz'
+        
         if STORE.exists('ilerleme'):
             son = STORE.get('ilerleme')['son_level']
             self.lbl_son_level.text = f"Son Çalışılan: {son}"
@@ -483,6 +488,7 @@ class LevelEkrani(Screen):
         elif mod == "cumle": self.lbl_baslik.text = "Cümle Kartları"
         elif mod == "etkinlik_cumle": self.lbl_baslik.text = "Cümle Kurmaca"
         elif mod == "etkinlik_kelime": self.lbl_baslik.text = "Kelime Kurmaca"
+        elif mod == "eng_eng": self.lbl_baslik.text = "Eng-Eng Leveller"
 
     def level_secildi(self, spinner, text):
         if not text.startswith("Level"): return
@@ -492,11 +498,18 @@ class LevelEkrani(Screen):
             baslangic = (level_num - 1) * kelime_basi
             bitis = baslangic + kelime_basi
             STORE.put('ilerleme', son_level=text)
-            secili_liste = YONETICI.veriler[baslangic:bitis]
+            
+            # Doğru listeden veriyi çek
+            if self.hedef_mod == "eng_eng":
+                secili_liste = YONETICI.eng_eng_veriler[baslangic:bitis]
+            else:
+                secili_liste = YONETICI.veriler[baslangic:bitis]
+
             if not secili_liste:
                 Popup(title='Hata', content=Label(text='Bu Level Boş!'), size_hint=(0.6, 0.3)).open(); return
 
-            if self.hedef_mod in ["kelime", "cumle"]:
+            # Yönlendirme
+            if self.hedef_mod in ["kelime", "cumle", "eng_eng"]:
                 ekran = self.manager.get_screen('calisma')
                 ekran.baslat_ozel(self.hedef_mod, secili_liste)
                 self.manager.current = 'calisma'
@@ -520,7 +533,7 @@ class InfoEkrani(Screen):
         layout.add_widget(self.lbl)
         imza = Label(text="Hazırlayan: Murat SERT", font_size='20sp', bold=True, color=(0.7, 0.7, 0.7, 1), size_hint=(1, 0.1))
         layout.add_widget(imza)
-        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=100)
+        btn = OzelButon(text="Geri Dön", background_color=(1,0.6,0,1), size_hint=(1, None), height=110)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         layout.add_widget(btn)
         self.add_widget(layout)
@@ -568,6 +581,7 @@ class KelimeEtkinlikEkrani(Screen):
         b_ileri.bind(on_press=lambda x: self.yeni_soru())
         nav.add_widget(b_menu); nav.add_widget(b_ileri)
         main_layout.add_widget(nav)
+        
         self.add_widget(main_layout)
 
     def guncelle_rect(self, instance, value):
@@ -751,7 +765,6 @@ class Calisma(Screen):
 
     def seslendir(self, i):
         if self.aktif: 
-            # --- YENİ MOD: ENG-ENG SESLENDİRME ---
             if self.mod == "eng_eng":
                 metin = f"{self.aktif['word']}. {self.aktif['ex']}"
                 SES.oku(metin)
@@ -764,13 +777,15 @@ class Calisma(Screen):
         self.kart.markup = True; v = self.aktif
         if not v: return
         
-        # --- YENİ MOD: ENG-ENG GÖRÜNÜM ---
+        # ENG-ENG MODU (YENİ FONT AYARLARI)
         if self.mod == "eng_eng":
             if not self.cevrildi:
                 self.kart.ana_renk = get_color_from_hex('#008080')
                 self.kart.guncelle_canvas()
                 self.kart.color = (1,1,1,1)
-                self.kart.text = f"[size=32][b]{v['word']}[/b][/size]\n\n{v['def']}\n\n[i]\"{v['ex']}\"[/i]"
+                
+                # --- İSTEK: KELİME 24sp (DAHA BÜYÜK), DİĞERLERİ 22sp ---
+                self.kart.text = f"[size=24][b]{v['word']}[/b][/size]\n\n[size=22]{v['def']}\n\n[i]\"{v['ex']}\"[/i][/size]"
             else:
                 self.kart.ana_renk = get_color_from_hex('#FBC02D')
                 self.kart.guncelle_canvas()
@@ -778,7 +793,7 @@ class Calisma(Screen):
                 self.kart.text = f"[b]{v['tr']}[/b]"
             return
 
-        # --- DİĞER MODLAR ---
+        # DİĞER MODLAR
         if not self.cevrildi:
             self.kart.ana_renk = get_color_from_hex('#37474F')
             self.kart.guncelle_canvas()
