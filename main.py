@@ -19,6 +19,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.dropdown import DropDown
+from kivy.uix.textinput import TextInput  # Fiil modülü için eklendi
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex, platform
 from kivy.graphics import Color, RoundedRectangle
@@ -26,18 +27,18 @@ from kivy.storage.jsonstore import JsonStore
 from plyer import tts
 
 # --- AYARLAR ---
-# 1. Ana Kelime Listesi
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPTfdbSV0cuDHK6hl1bnmOXUa_OzVnmYNIKhiiGvlVMMnPsUf27aN8dWqyuvkd4q84aINz5dvLoYmI/pub?output=csv"
-
-# 2. Dil Kursu Listesi
 CSV_URL_2 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTT6HjmaATaFYx7ahx4vG5lOfOzVnUEUwjaGZqSVnCPU36oggWBLqW5zoFP4C9t8IVMRg1jYez9rwB7/pub?output=csv"
-
-# 3. English - English Listesi
 CSV_URL_3 = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRFXYrFIbxrULpqPNYSks0xFVT2lfFrpuIU1eXJoNPg9CXzB126Nb7eVXQ7kirHLz_Xj7CiYGbBnBBK/pub?output=csv"
 
 Window.clearcolor = (0.15, 0.15, 0.15, 1)
 AYARLAR = {"hiz": 1.0}
 STORE = JsonStore('user_data.json')
+
+# --- 1. DEĞİŞİKLİK: AYARLARI BAŞLANGIÇTA YÜKLE ---
+if STORE.exists('ayarlar'):
+    kayitli_hiz = STORE.get('ayarlar')['hiz']
+    AYARLAR["hiz"] = kayitli_hiz
 
 # --- YEDEK VERİLER ---
 YEDEK_VERILER = [
@@ -54,6 +55,13 @@ ENG_ENG_YEDEK = [
     {"word": "Diligent", "def": "Having or showing care and conscientiousness in one's work or duties.", "tr": "Çalışkan", "ex": "Many caves are located only after a diligent search."},
     {"word": "Obscure", "def": "Not discovered or known about; uncertain.", "tr": "Belirsiz", "ex": "His origins and parentage are obscure."},
     {"word": "Resilient", "def": "Able to withstand or recover quickly from difficult conditions.", "tr": "Dirençli", "ex": "Babies are generally far more resilient than new parents realize."}
+]
+
+# --- YENİ: DÜZENSİZ FİİLLER TABLOSU ---
+IRREGULAR_VERBS = [
+    {"id": 1, "v1": "go", "v2": "went", "v3": "gone", "tr": "gitmek"},
+    {"id": 2, "v1": "see", "v2": "saw", "v3": "seen", "tr": "görmek"},
+    {"id": 3, "v1": "eat", "v2": "ate", "v3": "eaten", "tr": "yemek yemek"}
 ]
 
 # --- 3D GÖRÜNÜMLÜ ÖZEL BUTON ---
@@ -97,7 +105,7 @@ class BuyukSpinnerOption(SpinnerOption):
 class KaydirilabilirDropDown(DropDown):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.max_height = 800 
+        self.max_height = 800
 
 # --- KELİME PARÇASI ---
 class KelimeParcasi(Button):
@@ -110,7 +118,7 @@ class KelimeParcasi(Button):
         self.height = 80
         self.width = max(130, len(metin) * 24 + 50)
         self.background_normal = ''
-        self.background_color = (0.25, 0.35, 0.45, 1) 
+        self.background_color = (0.25, 0.35, 0.45, 1)
         self.color = (1, 1, 1, 1)
         self.bind(pos=self.ciz, size=self.ciz)
 
@@ -311,7 +319,7 @@ class AyarlarEkrani(Screen):
 
     def hiz_set(self, deger):
         AYARLAR["hiz"] = deger
-        STORE.put('ayarlar', hiz=deger)
+        STORE.put('ayarlar', hiz=deger) # Hız kaydediliyor
         self.gorsel_guncelle(deger)
         SES.oku("Test speed")
 
@@ -320,11 +328,12 @@ class AyarlarEkrani(Screen):
 class AnaMenu(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.HEDEF_YUKSEKLIK = 125
         self.main_box = BoxLayout(orientation='vertical', padding=0, spacing=0)
         
         baslik_kutusu = AnchorLayout(anchor_x='center', anchor_y='center', size_hint_y=0.15)
-        lbl_baslik = Label(text="İngilizce Ezber", font_size='40sp', bold=True)
-        baslik_kutusu.add_widget(lbl_baslik)
+        self.lbl_baslik = Label(text="İngilizce Ezber", font_size='40sp', bold=True)
+        baslik_kutusu.add_widget(self.lbl_baslik)
         self.main_box.add_widget(baslik_kutusu)
         
         orta_alan = AnchorLayout(anchor_x='center', anchor_y='center', size_hint_y=0.85)
@@ -332,66 +341,108 @@ class AnaMenu(Screen):
         self.grid_menu = GridLayout(cols=1, spacing=20, size_hint_y=None, padding=[0, 20, 0, 20])
         self.grid_menu.bind(minimum_height=self.grid_menu.setter('height'))
         
-        # --- BUTON BOYUTU %10 BÜYÜTÜLDÜ (110 -> 125) ---
-        HEDEF_YUKSEKLIK = 125
+        self.scroll.add_widget(self.grid_menu)
+        orta_alan.add_widget(self.scroll)
+        self.main_box.add_widget(orta_alan)
+        self.add_widget(self.main_box)
         
-        btn1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn1.bind(on_press=lambda x: self.level_sec("kelime"))
-        
-        btn2 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn2.bind(on_press=lambda x: self.level_sec("cumle"))
-        
-        btn_kelime_etkinlik = OzelButon(text="Kelime Kurma (Etkinlik)", background_color=(0.9, 0.5, 0.1, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_kelime_etkinlik.bind(on_press=lambda x: self.level_sec("etkinlik_kelime"))
+        self.grid_menu.bind(height=self.update_scroll_height)
+        Window.bind(height=self.update_scroll_height)
 
-        btn_cumle_etkinlik = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_cumle_etkinlik.bind(on_press=lambda x: self.level_sec("etkinlik_cumle"))
-        
-        btn_dil_kursu = OzelButon(text="Dil Kursu Kelimeleri", background_color=(0.9, 0.3, 0.3, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_dil_kursu.bind(on_press=self.dil_kursu_baslat_kelime)
+    def on_enter(self):
+        # Ekrana her dönüldüğünde ana menüyü çiz
+        self.ana_menuyu_ciz()
 
-        btn_dil_kursu_cumle = OzelButon(text="Dil Kursu Cümleleri", background_color=(0.8, 0.4, 0.2, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_dil_kursu_cumle.bind(on_press=self.dil_kursu_baslat_cumle)
+    def update_scroll_height(self, *args):
+        max_h = Window.height * 0.85
+        content_h = self.grid_menu.height
+        self.scroll.height = min(max_h, content_h)
+
+    # --- 2. DEĞİŞİKLİK: MENÜ HİYERARŞİSİ ---
+    def temizle_ve_ciz(self):
+        self.grid_menu.clear_widgets()
+    
+    def ana_menuyu_ciz(self):
+        self.temizle_ve_ciz()
+        self.lbl_baslik.text = "ANA MENÜ"
         
-        # English - English Butonu
-        btn_eng_eng = OzelButon(text="English - English", background_color=(0.0, 0.7, 0.7, 1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn_eng_eng.bind(on_press=lambda x: self.level_sec("eng_eng"))
+        btn_kelime = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        btn_kelime.bind(on_press=self.kelime_alt_menu_ciz)
         
-        btn3 = OzelButon(text="Listeyi Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn3.bind(on_press=self.guncelle)
-        
-        alt_grid = GridLayout(cols=2, spacing=15, size_hint=(1, None), height=HEDEF_YUKSEKLIK)
+        btn_cumle = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        btn_cumle.bind(on_press=self.cumle_alt_menu_ciz)
+
+        # 6. MADDEDE İSTENEN YENİ FİİL BUTONU
+        btn_fiil = OzelButon(text="Fiil Çalış", background_color=(0.6, 0.2, 0.6, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        btn_fiil.bind(on_press=lambda x: setattr(self.manager, 'current', 'fiil_calisma'))
+
+        alt_grid = GridLayout(cols=2, spacing=15, size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
         b_ayar = OzelButon(text="Ayarlar", background_color=(0.5,0.5,0.5,1))
         b_ayar.bind(on_press=lambda x: setattr(self.manager, 'current', 'ayarlar'))
         b_info = OzelButon(text="Info", background_color=(0,0.8,0.8,1))
         b_info.bind(on_press=lambda x: setattr(self.manager, 'current', 'info'))
         alt_grid.add_widget(b_ayar); alt_grid.add_widget(b_info)
         
-        btn5 = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=HEDEF_YUKSEKLIK)
-        btn5.bind(on_press=lambda x: sys.exit())
+        btn_guncelle = OzelButon(text="Kelime Listelerini Güncelle", background_color=(1,0.5,0,1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        btn_guncelle.bind(on_press=self.guncelle)
         
-        self.grid_menu.add_widget(btn1)
-        self.grid_menu.add_widget(btn2)
-        self.grid_menu.add_widget(btn_kelime_etkinlik)
-        self.grid_menu.add_widget(btn_cumle_etkinlik)
-        self.grid_menu.add_widget(btn_dil_kursu)
-        self.grid_menu.add_widget(btn_dil_kursu_cumle)
-        self.grid_menu.add_widget(btn_eng_eng)
-        self.grid_menu.add_widget(btn3)
-        self.grid_menu.add_widget(alt_grid)
-        self.grid_menu.add_widget(btn5)
-        
-        self.grid_menu.bind(height=self.update_scroll_height)
-        Window.bind(height=self.update_scroll_height)
-        self.scroll.add_widget(self.grid_menu)
-        orta_alan.add_widget(self.scroll)
-        self.main_box.add_widget(orta_alan)
-        self.add_widget(self.main_box)
+        btn_cikis = OzelButon(text="Çıkış", background_color=(0.8,0.2,0.2,1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        btn_cikis.bind(on_press=lambda x: sys.exit())
 
-    def update_scroll_height(self, *args):
-        max_h = Window.height * 0.85
-        content_h = self.grid_menu.height
-        self.scroll.height = min(max_h, content_h)
+        self.grid_menu.add_widget(btn_kelime)
+        self.grid_menu.add_widget(btn_cumle)
+        self.grid_menu.add_widget(btn_fiil)
+        self.grid_menu.add_widget(alt_grid)
+        self.grid_menu.add_widget(btn_guncelle)
+        self.grid_menu.add_widget(btn_cikis)
+
+    def kelime_alt_menu_ciz(self, instance):
+        self.temizle_ve_ciz()
+        self.lbl_baslik.text = "KELİME ÇALIŞ"
+        
+        # 3. MADDE: Kelime Alt Menüleri
+        b1 = OzelButon(text="Kelime Çalış", background_color=(0.2,0.6,0.8,1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b1.bind(on_press=lambda x: self.level_sec("kelime"))
+        
+        b2 = OzelButon(text="Kelime Kurma (Etkinlik)", background_color=(0.9, 0.5, 0.1, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b2.bind(on_press=lambda x: self.level_sec("etkinlik_kelime"))
+        
+        b3 = OzelButon(text="Dil Kursu Kelimeleri", background_color=(0.9, 0.3, 0.3, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b3.bind(on_press=self.dil_kursu_baslat_kelime)
+        
+        b4 = OzelButon(text="English - English", background_color=(0.0, 0.7, 0.7, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b4.bind(on_press=lambda x: self.level_sec("eng_eng"))
+        
+        b_geri = OzelButon(text="< Geri Dön", background_color=(0.4, 0.4, 0.4, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b_geri.bind(on_press=lambda x: self.ana_menuyu_ciz())
+
+        self.grid_menu.add_widget(b1)
+        self.grid_menu.add_widget(b2)
+        self.grid_menu.add_widget(b3)
+        self.grid_menu.add_widget(b4)
+        self.grid_menu.add_widget(b_geri)
+
+    def cumle_alt_menu_ciz(self, instance):
+        self.temizle_ve_ciz()
+        self.lbl_baslik.text = "CÜMLE ÇALIŞ"
+        
+        # 4. MADDE: Cümle Alt Menüleri
+        b1 = OzelButon(text="Cümle Çalış", background_color=(0.3,0.7,0.3,1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b1.bind(on_press=lambda x: self.level_sec("cumle"))
+        
+        b2 = OzelButon(text="Cümle Kurma (Etkinlik)", background_color=(0.6, 0.2, 0.8, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b2.bind(on_press=lambda x: self.level_sec("etkinlik_cumle"))
+        
+        b3 = OzelButon(text="Dil Kursu Cümleleri", background_color=(0.8, 0.4, 0.2, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b3.bind(on_press=self.dil_kursu_baslat_cumle)
+        
+        b_geri = OzelButon(text="< Geri Dön", background_color=(0.4, 0.4, 0.4, 1), size_hint=(1, None), height=self.HEDEF_YUKSEKLIK)
+        b_geri.bind(on_press=lambda x: self.ana_menuyu_ciz())
+
+        self.grid_menu.add_widget(b1)
+        self.grid_menu.add_widget(b2)
+        self.grid_menu.add_widget(b3)
+        self.grid_menu.add_widget(b_geri)
 
     def guncelle(self, i):
         p=Popup(title='İşlem', content=Label(text='Tüm Listeler İndiriliyor...'), size_hint=(0.7, 0.3)); p.open()
@@ -400,9 +451,9 @@ class AnaMenu(Screen):
 
     def level_sec(self, mod_tipi):
         if mod_tipi == "eng_eng" and not YONETICI.eng_eng_veriler:
-             Popup(title='Uyarı', content=Label(text='Eng-Eng Verisi Yok!'), size_hint=(0.8,0.4)).open(); return
+            Popup(title='Uyarı', content=Label(text='Eng-Eng Verisi Yok!'), size_hint=(0.8,0.4)).open(); return
         elif mod_tipi != "eng_eng" and not YONETICI.veriler:
-             Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
+            Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
 
         ekran = self.manager.get_screen('level')
         ekran.modu_ayarla(mod_tipi)
@@ -414,9 +465,6 @@ class AnaMenu(Screen):
     def dil_kursu_baslat_cumle(self, instance):
         self.baslat_calisma("cumle", YONETICI.dil_kursu_veriler)
 
-    def eng_eng_baslat(self, instance):
-        pass
-
     def baslat_calisma(self, mod, liste):
         if not liste:
             Popup(title='Uyarı', content=Label(text='Liste Boş!'), size_hint=(0.8, 0.4)).open()
@@ -425,12 +473,95 @@ class AnaMenu(Screen):
         ekran.baslat_ozel(mod, liste)
         self.manager.current = 'calisma'
 
-    def gecis(self, m):
-        if not YONETICI.veriler: 
-            Popup(title='Uyarı', content=Label(text='Veri Yok!'), size_hint=(0.8,0.4)).open(); return
-        if m == "etkinlik":
-            self.manager.get_screen('etkinlik').baslat()
-            self.manager.current = 'etkinlik'
+# --- 6. DEĞİŞİKLİK: YENİ FİİL ÇALIŞMA EKRANI ---
+class FiilCalismaEkrani(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.aktif_veri = None
+        self.hedef_key = ""  # v1, v2 veya v3
+        self.dogru_cevap = ""
+
+        # Layout
+        self.main_box = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        
+        # Başlık
+        self.main_box.add_widget(Label(text="DÜZENSİZ FİİLLER", font_size='28sp', bold=True, size_hint=(1, 0.1)))
+        
+        # Bilgi Kutusu (Soru burada görünecek)
+        self.lbl_soru = Label(text="...", font_size='22sp', markup=True, size_hint=(1, 0.4))
+        self.main_box.add_widget(self.lbl_soru)
+        
+        # Cevap Giriş Alanı
+        self.input_box = TextInput(
+            multiline=False, font_size='24sp', halign='center', 
+            size_hint=(1, 0.15), background_color=(0.9, 0.9, 0.9, 1), foreground_color=(0,0,0,1)
+        )
+        self.input_box.bind(on_text_validate=self.kontrol_et) # Enter'a basınca kontrol et
+        self.main_box.add_widget(self.input_box)
+        
+        # Butonlar
+        btns = GridLayout(cols=2, spacing=15, size_hint=(1, 0.15))
+        
+        btn_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1))
+        btn_kontrol.bind(on_press=self.kontrol_et)
+        
+        btn_goster = OzelButon(text="Kelimeyi Gör", background_color=(1, 0.6, 0, 1))
+        btn_goster.bind(on_press=self.goster)
+        
+        btns.add_widget(btn_kontrol)
+        btns.add_widget(btn_goster)
+        self.main_box.add_widget(btns)
+        
+        nav_btns = GridLayout(cols=2, spacing=15, size_hint=(1, 0.15))
+        btn_menu = OzelButon(text="Ana Menü", background_color=(0.5, 0.5, 0.5, 1))
+        btn_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
+        
+        btn_ileri = OzelButon(text="İleri ->", background_color=(0.2, 0.6, 0.8, 1))
+        btn_ileri.bind(on_press=self.yeni_soru)
+        
+        nav_btns.add_widget(btn_menu)
+        nav_btns.add_widget(btn_ileri)
+        self.main_box.add_widget(nav_btns)
+        
+        self.add_widget(self.main_box)
+
+    def on_enter(self):
+        self.yeni_soru()
+
+    def yeni_soru(self, *args):
+        self.input_box.text = ""
+        self.aktif_veri = random.choice(IRREGULAR_VERBS)
+        
+        # Hangi hali soracağımızı rastgele seç (v1, v2 veya v3)
+        seçenekler = ["v1", "v2", "v3"]
+        self.hedef_key = random.choice(seçenekler)
+        self.dogru_cevap = self.aktif_veri[self.hedef_key]
+        
+        # Görünecek metni hazırla
+        v1_txt = "???" if self.hedef_key == "v1" else self.aktif_veri["v1"]
+        v2_txt = "???" if self.hedef_key == "v2" else self.aktif_veri["v2"]
+        v3_txt = "???" if self.hedef_key == "v3" else self.aktif_veri["v3"]
+        
+        soru_metni = (
+            f"[b]Türkçe:[/b] {self.aktif_veri['tr']}\n\n"
+            f"V1 (Base): {v1_txt}\n"
+            f"V2 (Past): {v2_txt}\n"
+            f"V3 (Participle): {v3_txt}\n\n"
+            f"[i]Eksik olan hali yazınız...[/i]"
+        )
+        self.lbl_soru.text = soru_metni
+
+    def kontrol_et(self, *args):
+        kullanici_cevabi = self.input_box.text.strip().lower()
+        if kullanici_cevabi == self.dogru_cevap.lower():
+            Popup(title='Tebrikler', content=Label(text='✅ DOĞRU!', font_size='24sp'), size_hint=(0.6, 0.3)).open()
+            SES.oku("Correct")
+        else:
+            Popup(title='Yanlış', content=Label(text='❌ Tekrar Deneyin', font_size='24sp'), size_hint=(0.6, 0.3)).open()
+
+    def goster(self, *args):
+        self.input_box.text = self.dogru_cevap
+        SES.oku(self.dogru_cevap)
 
 class LevelEkrani(Screen):
     def __init__(self, **kwargs):
@@ -757,7 +888,7 @@ class Calisma(Screen):
         else: self.kart.text = "Bu levelda veri yok!"
 
     def seslendir(self, i):
-        if self.aktif: 
+        if self.aktif:
             if self.mod == "eng_eng":
                 metin = f"{self.aktif['word']}. {self.aktif['ex']}"
                 SES.oku(metin)
@@ -770,16 +901,11 @@ class Calisma(Screen):
         self.kart.markup = True; v = self.aktif
         if not v: return
         
-        # --- FONT EŞİTLEME (İSTEK ÜZERİNE GÜNCELLENDİ) ---
         if self.mod == "eng_eng":
             if not self.cevrildi:
                 self.kart.ana_renk = get_color_from_hex('#008080')
                 self.kart.guncelle_canvas()
                 self.kart.color = (1,1,1,1)
-                
-                # --- YAZI BOYUTU EŞİTLENDİ ---
-                # Diğer bölümlerle aynı (22sp) ancak başlık kalın, örnek italik.
-                # [size=...] etiketleri kaldırıldı.
                 self.kart.text = f"[b]{v['word']}[/b]\n\n{v['def']}\n\n[i]\"{v['ex']}\"[/i]"
             else:
                 self.kart.ana_renk = get_color_from_hex('#FBC02D')
@@ -816,7 +942,7 @@ class Calisma(Screen):
                 self.yon=random.choice(["tr_to_en","en_to_tr"])
             self.cevrildi=False; self.guncelle()
         except: pass
-    def geri(self, i): 
+    def geri(self, i):
         if self.gecmis: s=self.gecmis.pop(); self.aktif=s["v"]; self.yon=s["y"]; self.cevrildi=False; self.guncelle()
 
 class AppMain(App):
@@ -829,6 +955,7 @@ class AppMain(App):
         sm.add_widget(Calisma(name='calisma'))
         sm.add_widget(EtkinlikEkrani(name='etkinlik_cumle'))
         sm.add_widget(KelimeEtkinlikEkrani(name='etkinlik_kelime'))
+        sm.add_widget(FiilCalismaEkrani(name='fiil_calisma')) # Yeni ekran eklendi
         return sm
 
 if __name__ == '__main__': AppMain().run()
