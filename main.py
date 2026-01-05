@@ -59,7 +59,8 @@ ENG_ENG_YEDEK = [
 FIILLER_YEDEK = [
     {"v1": "go", "v2": "went", "v3": "gone", "tr": "gitmek"},
     {"v1": "see", "v2": "saw", "v3": "seen", "tr": "görmek"},
-    {"v1": "eat", "v2": "ate", "v3": "eaten", "tr": "yemek yemek"}
+    {"v1": "eat", "v2": "ate", "v3": "eaten", "tr": "yemek yemek"},
+    {"v1": "burn", "v2": "burned/burnt", "v3": "burned/burnt", "tr": "yanmak/yakmak"} 
 ]
 
 # --- UI BİLEŞENLERİ ---
@@ -395,7 +396,7 @@ class AnaMenu(Screen):
         ekran.baslat_ozel(mod, liste)
         self.manager.current = 'calisma'
 
-# --- GÜNCELLENMİŞ FİİL ÇALIŞMA EKRANI (HARF TIKLAMALI) ---
+# --- GÜNCELLENMİŞ FİİL ÇALIŞMA EKRANI (HARF TIKLAMALI + SLASH DESTEĞİ) ---
 class FiilCalismaEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -410,8 +411,9 @@ class FiilCalismaEkrani(Screen):
         # Başlık
         self.main_box.add_widget(Label(text="DÜZENSİZ FİİLLER", font_size='28sp', bold=True, size_hint=(1, 0.1)))
         
-        # Soru Alanı
-        self.lbl_soru = Label(text="...", font_size='22sp', markup=True, size_hint=(1, 0.35))
+        # Soru Alanı (METİN KAYDIRMA ÖZELLİĞİ EKLENDİ)
+        self.lbl_soru = Label(text="...", font_size='20sp', markup=True, size_hint=(1, 0.35), halign='center', valign='middle')
+        self.lbl_soru.bind(size=lambda *x: setattr(self.lbl_soru, 'text_size', (self.lbl_soru.width - 20, None)))
         self.main_box.add_widget(self.lbl_soru)
 
         # Cevap Kutusu (Harflerin gideceği yer)
@@ -467,8 +469,8 @@ class FiilCalismaEkrani(Screen):
         v3_txt = "???" if self.hedef_key == "v3" else self.aktif_veri["v3"]
         self.lbl_soru.text = f"[b]Türkçe:[/b] {self.aktif_veri['tr']}\n\nV1: {v1_txt}\nV2: {v2_txt}\nV3: {v3_txt}\n\n[i]Eksik olan hali harfleri seçerek oluşturun...[/i]"
 
-        # Harfleri Hazırla
-        temiz_cevap = re.sub(r'[^a-zA-Z]', '', self.dogru_cevap).lower()
+        # Harfleri Hazırla (SLASH İŞARETİ ARTIK SİLİNMİYOR)
+        temiz_cevap = re.sub(r'[^a-zA-Z/]', '', self.dogru_cevap).lower()
         self.dogru_siralama = list(temiz_cevap)
         karisik_harfler = self.dogru_siralama.copy()
         random.shuffle(karisik_harfler)
