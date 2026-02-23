@@ -396,46 +396,38 @@ class AnaMenu(Screen):
         ekran.baslat_ozel(mod, liste)
         self.manager.current = 'calisma'
 
-# --- GÜNCELLENMİŞ FİİL ÇALIŞMA EKRANI (HARF TIKLAMALI + SLASH DESTEĞİ) ---
+
 class FiilCalismaEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.aktif_veri = None
-        self.hedef_key = ""
-        self.dogru_cevap = ""
-        self.dogru_siralama = []
-        self.kullanici_siralama = []
-
+        self.aktif_veri = None; self.hedef_key = ""; self.dogru_cevap = ""; self.dogru_siralama = []; self.kullanici_siralama = []
         self.main_box = BoxLayout(orientation='vertical', padding=20, spacing=15)
         
-        # Başlık
-        self.main_box.add_widget(Label(text="DÜZENSİZ FİİLLER", font_size='28sp', bold=True, size_hint=(1, 0.1)))
-        
-        # Soru Alanı (METİN KAYDIRMA ÖZELLİĞİ EKLENDİ)
-        self.lbl_soru = Label(text="...", font_size='20sp', markup=True, size_hint=(1, 0.35), halign='center', valign='middle')
+        # %10 (0.10)
+        self.main_box.add_widget(Label(text="DÜZENSİZ FİİLLER", font_size='28sp', bold=True, size_hint=(1, 0.10)))
+        # %25 (0.25)
+        self.lbl_soru = Label(text="...", font_size='20sp', markup=True, size_hint=(1, 0.25), halign='center', valign='middle')
         self.lbl_soru.bind(size=lambda *x: setattr(self.lbl_soru, 'text_size', (self.lbl_soru.width - 20, None)))
         self.main_box.add_widget(self.lbl_soru)
-
-        # Cevap Kutusu (Harflerin gideceği yer)
+        # %15 (0.15)
         self.cevap_kutusu = StackLayout(padding=10, spacing=10, size_hint=(1, 0.15))
         with self.cevap_kutusu.canvas.before:
-            Color(0.2, 0.2, 0.2, 1)
-            self.rect_cevap = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
+            Color(0.2, 0.2, 0.2, 1); self.rect_cevap = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
         self.cevap_kutusu.bind(pos=self.guncelle_rect_cevap, size=self.guncelle_rect_cevap)
         self.main_box.add_widget(self.cevap_kutusu)
-
-        # Harf Havuzu (Karışık harfler)
+        # %25 (0.25)
         self.harf_havuzu = StackLayout(padding=10, spacing=10, size_hint=(1, 0.25))
         self.main_box.add_widget(self.harf_havuzu)
-
-        # Butonlar
-        btns = GridLayout(cols=2, spacing=15, size_hint=(1, 0.15))
+        
+        # %12.5 (0.125)
+        btns = GridLayout(cols=2, spacing=15, size_hint=(1, 0.125))
         btn_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1)); btn_kontrol.bind(on_press=self.kontrol_et)
         btn_goster = OzelButon(text="Kelimeyi Gör", background_color=(1, 0.6, 0, 1)); btn_goster.bind(on_press=self.goster)
         btns.add_widget(btn_kontrol); btns.add_widget(btn_goster)
         self.main_box.add_widget(btns)
         
-        nav_btns = GridLayout(cols=2, spacing=15, size_hint=(1, 0.15))
+        # %12.5 (0.125) Toplam 1.0 (Yani tam %100 ekrana oturur)
+        nav_btns = GridLayout(cols=2, spacing=15, size_hint=(1, 0.125))
         btn_menu = OzelButon(text="Ana Menü", background_color=(0.5, 0.5, 0.5, 1)); btn_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
         btn_ileri = OzelButon(text="İleri ->", background_color=(0.2, 0.6, 0.8, 1)); btn_ileri.bind(on_press=self.yeni_soru)
         nav_btns.add_widget(btn_menu); nav_btns.add_widget(btn_ileri)
@@ -444,63 +436,38 @@ class FiilCalismaEkrani(Screen):
         self.add_widget(self.main_box)
 
     def guncelle_rect_cevap(self, instance, value):
-        self.rect_cevap.pos = instance.pos
-        self.rect_cevap.size = instance.size
-
+        self.rect_cevap.pos = instance.pos; self.rect_cevap.size = instance.size
     def on_enter(self): self.yeni_soru()
-
     def yeni_soru(self, *args):
-        # Temizlik
-        self.cevap_kutusu.clear_widgets()
-        self.harf_havuzu.clear_widgets()
-        self.kullanici_siralama = []
-
+        self.cevap_kutusu.clear_widgets(); self.harf_havuzu.clear_widgets(); self.kullanici_siralama = []
         if not YONETICI.fiil_veriler:
-             self.lbl_soru.text = "Fiil Listesi Yüklenemedi!"
-             return
-
+             self.lbl_soru.text = "Fiil Listesi Yüklenemedi!"; return
         self.aktif_veri = random.choice(YONETICI.fiil_veriler)
         self.hedef_key = random.choice(["v1", "v2", "v3"])
         self.dogru_cevap = self.aktif_veri[self.hedef_key]
-        
-        # Soru Metni
         v1_txt = "???" if self.hedef_key == "v1" else self.aktif_veri["v1"]
         v2_txt = "???" if self.hedef_key == "v2" else self.aktif_veri["v2"]
         v3_txt = "???" if self.hedef_key == "v3" else self.aktif_veri["v3"]
         self.lbl_soru.text = f"[b]Türkçe:[/b] {self.aktif_veri['tr']}\n\nV1: {v1_txt}\nV2: {v2_txt}\nV3: {v3_txt}\n\n[i]Eksik olan hali harfleri seçerek oluşturun...[/i]"
-
-        # Harfleri Hazırla (SLASH İŞARETİ ARTIK SİLİNMİYOR)
         temiz_cevap = re.sub(r'[^a-zA-Z/]', '', self.dogru_cevap).lower()
         self.dogru_siralama = list(temiz_cevap)
         karisik_harfler = self.dogru_siralama.copy()
         random.shuffle(karisik_harfler)
-
         for harf in karisik_harfler:
-            btn = HarfParcasi(harf=harf.upper())
-            btn.bind(on_press=self.harf_tasima)
-            self.harf_havuzu.add_widget(btn)
-
+            btn = HarfParcasi(harf=harf.upper()); btn.bind(on_press=self.harf_tasima); self.harf_havuzu.add_widget(btn)
     def harf_tasima(self, btn):
         if btn.parent == self.harf_havuzu:
-            self.harf_havuzu.remove_widget(btn)
-            self.cevap_kutusu.add_widget(btn)
-            self.kullanici_siralama.append(btn.text.lower())
+            self.harf_havuzu.remove_widget(btn); self.cevap_kutusu.add_widget(btn); self.kullanici_siralama.append(btn.text.lower())
         else:
-            self.cevap_kutusu.remove_widget(btn)
-            self.harf_havuzu.add_widget(btn)
-            if btn.text.lower() in self.kullanici_siralama:
-                self.kullanici_siralama.remove(btn.text.lower())
-
+            self.cevap_kutusu.remove_widget(btn); self.harf_havuzu.add_widget(btn)
+            if btn.text.lower() in self.kullanici_siralama: self.kullanici_siralama.remove(btn.text.lower())
     def kontrol_et(self, *args):
         if self.kullanici_siralama == self.dogru_siralama:
-            Popup(title='Tebrikler', content=Label(text='✅ DOĞRU!', font_size='24sp'), size_hint=(0.6, 0.3)).open()
-            SES.oku("Correct")
+            Popup(title='Tebrikler', content=Label(text='✅ DOĞRU!', font_size='24sp'), size_hint=(0.6, 0.3)).open(); SES.oku("Correct")
         else:
             Popup(title='Yanlış', content=Label(text='❌ Harfleri Kontrol Edin', font_size='24sp'), size_hint=(0.6, 0.3)).open()
-
     def goster(self, *args):
-        Popup(title='Cevap', content=Label(text=self.dogru_cevap, font_size='30sp'), size_hint=(0.6, 0.3)).open()
-        SES.oku(self.dogru_cevap)
+        Popup(title='Cevap', content=Label(text=self.dogru_cevap, font_size='30sp'), size_hint=(0.6, 0.3)).open(); SES.oku(self.dogru_cevap)
 
 
 class LevelEkrani(Screen):
@@ -575,28 +542,39 @@ class InfoEkrani(Screen):
         s = len(YONETICI.veriler); s2 = len(YONETICI.dil_kursu_veriler); s3 = len(YONETICI.eng_eng_veriler); s4 = len(YONETICI.fiil_veriler)
         self.lbl.text = f'Ana Liste: "{s}"\nDil Kursu: "{s2}"\nEng-Eng: "{s3}"\nFiiller: "{s4}"'
 
+# --- GÜNCELLENMİŞ VE ONARILMIŞ KELİME ETKİNLİĞİ ---
 class KelimeEtkinlikEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.aktif_veri = None; self.dogru_siralama = []; self.kullanici_siralama = []; self.calisma_listesi = []
         main_layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
+        
+        # 0.15 + 0.20 + 0.35 + 0.15 + 0.15 = 1.0
         self.lbl_ipucu = Label(text="Kelimeyi Yazın", font_size='24sp', size_hint=(1, 0.15))
         main_layout.add_widget(self.lbl_ipucu)
+        
         self.cevap_kutusu = StackLayout(padding=20, spacing=15, size_hint=(1, 0.20))
-        with self.cevap_kutusu.canvas.before: Color(0.2, 0.2, 0.2, 1); self.rect = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
+        with self.cevap_kutusu.canvas.before: 
+            Color(0.2, 0.2, 0.2, 1); self.rect = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
         self.cevap_kutusu.bind(pos=self.guncelle_rect, size=self.guncelle_rect)
         main_layout.add_widget(self.cevap_kutusu)
-        self.harf_havuzu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.45))
+        
+        self.harf_havuzu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.35))
         main_layout.add_widget(self.harf_havuzu)
-        btns = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=100)
-        b_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1), size_hint=(1, None), height=100); b_kontrol.bind(on_press=self.kontrol_et)
-        b_goster = OzelButon(text="Kelimeyi Gör", background_color=(1, 0.6, 0, 1), size_hint=(1, None), height=100); b_goster.bind(on_press=self.dogruyu_goster)
+        
+        # Bu kısım eklenmediği için butonlar çıkmıyordu, eklendi ve dinamikleştirildi!
+        btns = GridLayout(cols=2, spacing=10, size_hint=(1, 0.15))
+        b_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1)); b_kontrol.bind(on_press=self.kontrol_et)
+        b_goster = OzelButon(text="Kelimeyi Gör", background_color=(1, 0.6, 0, 1)); b_goster.bind(on_press=self.dogruyu_goster)
         btns.add_widget(b_kontrol); btns.add_widget(b_goster)
-        nav = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=100)
-        b_menu = OzelButon(text="Menü", background_color=(0.5, 0.5, 0.5, 1), size_hint=(1, None), height=100); b_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
-        b_ileri = OzelButon(text="İleri", background_color=(0.2, 0.6, 0.8, 1), size_hint=(1, None), height=100); b_ileri.bind(on_press=lambda x: self.yeni_soru())
+        main_layout.add_widget(btns)
+        
+        nav = GridLayout(cols=2, spacing=10, size_hint=(1, 0.15))
+        b_menu = OzelButon(text="Menü", background_color=(0.5, 0.5, 0.5, 1)); b_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
+        b_ileri = OzelButon(text="İleri", background_color=(0.2, 0.6, 0.8, 1)); b_ileri.bind(on_press=lambda x: self.yeni_soru())
         nav.add_widget(b_menu); nav.add_widget(b_ileri)
         main_layout.add_widget(nav)
+        
         self.add_widget(main_layout)
     def guncelle_rect(self, instance, value): self.rect.pos = instance.pos; self.rect.size = instance.size
     def baslat(self, liste): self.calisma_listesi = liste; self.yeni_soru()
@@ -623,28 +601,40 @@ class KelimeEtkinlikEkrani(Screen):
             kelime = self.aktif_veri['en']; temiz = re.sub(r"\(.*?\)", "", kelime).strip()
             Popup(title='Doğru Kelime', content=Label(text=kelime, font_size='24sp'), size_hint=(0.8, 0.4)).open(); SES.oku(temiz)
 
+# --- GÜNCELLENMİŞ VE ONARILMIŞ CÜMLE ETKİNLİĞİ ---
 class EtkinlikEkrani(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.aktif_veri = None; self.dogru_siralama = []; self.kullanici_siralama = []
         main_layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
+        
+        # 0.15 + 0.20 + 0.35 + 0.15 + 0.15 = 1.0
         self.lbl_ipucu = Label(text="Cümleyi Oluşturun", font_size='20sp', size_hint=(1, 0.15), halign='center', valign='middle')
         self.lbl_ipucu.bind(size=lambda *x: setattr(self.lbl_ipucu, 'text_size', (self.lbl_ipucu.width - 20, None)))
         main_layout.add_widget(self.lbl_ipucu)
-        self.cevap_kutusu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.30))
-        with self.cevap_kutusu.canvas.before: Color(0.2, 0.2, 0.2, 1); self.rect = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
+        
+        self.cevap_kutusu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.20))
+        with self.cevap_kutusu.canvas.before: 
+            Color(0.2, 0.2, 0.2, 1); self.rect = RoundedRectangle(pos=self.cevap_kutusu.pos, size=self.cevap_kutusu.size, radius=[10])
         self.cevap_kutusu.bind(pos=self.guncelle_rect, size=self.guncelle_rect)
         main_layout.add_widget(self.cevap_kutusu)
+        
         self.kelime_havuzu = StackLayout(padding=20, spacing=25, size_hint=(1, 0.35))
         main_layout.add_widget(self.kelime_havuzu)
-        btns = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=100)
-        b_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1), size_hint=(1, None), height=100); b_kontrol.bind(on_press=self.kontrol_et)
-        b_goster = OzelButon(text="Doğruyu Gör", background_color=(1, 0.6, 0, 1), size_hint=(1, None), height=100); b_goster.bind(on_press=self.dogruyu_goster)
+        
+        # Butonlar eklendi!
+        btns = GridLayout(cols=2, spacing=10, size_hint=(1, 0.15))
+        b_kontrol = OzelButon(text="Kontrol Et", background_color=(0.2, 0.8, 0.2, 1)); b_kontrol.bind(on_press=self.kontrol_et)
+        b_goster = OzelButon(text="Doğruyu Gör", background_color=(1, 0.6, 0, 1)); b_goster.bind(on_press=self.dogruyu_goster)
         btns.add_widget(b_kontrol); btns.add_widget(b_goster)
-        nav = GridLayout(cols=2, spacing=10, size_hint=(1, None), height=100)
-        b_menu = OzelButon(text="Menü", background_color=(0.5, 0.5, 0.5, 1), size_hint=(1, None), height=100); b_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
-        b_ileri = OzelButon(text="İleri", background_color=(0.2, 0.6, 0.8, 1), size_hint=(1, None), height=100); b_ileri.bind(on_press=lambda x: self.baslat())
+        main_layout.add_widget(btns)
+        
+        nav = GridLayout(cols=2, spacing=10, size_hint=(1, 0.15))
+        b_menu = OzelButon(text="Menü", background_color=(0.5, 0.5, 0.5, 1)); b_menu.bind(on_press=lambda x: setattr(self.manager, 'current', 'menu'))
+        b_ileri = OzelButon(text="İleri", background_color=(0.2, 0.6, 0.8, 1)); b_ileri.bind(on_press=lambda x: self.baslat())
         nav.add_widget(b_menu); nav.add_widget(b_ileri)
+        main_layout.add_widget(nav)
+        
         self.add_widget(main_layout)
     def guncelle_rect(self, instance, value): self.rect.pos = instance.pos; self.rect.size = instance.size
     def baslat(self, liste=None):
